@@ -115,7 +115,16 @@ describe('WorkerManager Full Integration with Python Subprocess', () => {
         /loopback/i
       );
 
-      // 5. Graceful stop
+      // 5. Test cancel & pause download protocol commands
+      const cancelRes = await manager.cancelDownload('test_job_cancel');
+      expect(cancelRes.jobId).toBe('test_job_cancel');
+      expect(cancelRes.cancelled).toBe(false);
+
+      const pauseRes = await manager.pauseDownload('test_job_pause');
+      expect(pauseRes.jobId).toBe('test_job_pause');
+      expect(pauseRes.paused).toBe(false);
+
+      // 6. Graceful stop
       await manager.stop();
       expect(manager.getStatusInfo().state).toBe('stopped');
       expect(manager.getStatusInfo().isAlive).toBe(false);

@@ -7,7 +7,7 @@
 - [x] Typed Secure IPC Bridge (Milestone 1)
 - [x] Python Worker & JSON Lines Heartbeat Protocol (Milestone 2)
 - [x] yt-dlp Video & Audio Extraction & URL Analyzer (Milestone 3)
-- [ ] Download Queue State Machine & Scheduler (Milestone 4)
+- [x] Download Queue State Machine & Scheduler (Milestone 4)
 - [ ] Direct HTTP/HTTPS Chunked Downloader with Resume (Milestone 5)
 - [ ] Image & Gallery Extraction (Milestone 5)
 - [ ] Batch & Playlist Processing (Milestone 6)

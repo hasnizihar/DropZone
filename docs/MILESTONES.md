@@ -43,13 +43,16 @@ This document tracks progress through the 10 core milestones defined in the DROP
 ---
 
 ## Milestone 4: Core Downloads & Queue Management
-- **Status:** Pending
+- **Status:** Completed (2026-11-12)
 - **Scope:**
-  - State machine: `pending` -> `analyzing` -> `ready` -> `downloading` -> `completed` / `failed` / `cancelled` / `paused`.
-  - Concurrency management (configurable max concurrent downloads, default 3).
-  - Real-time progress events, speed calculation, ETA calculation.
-  - Cancellation, pause, resume, and retry mechanics.
-  - SQLite persistence of download items.
+  - Implemented authoritative `QueueManager` in Electron Main as single source of truth for queue ordering, state machine, dynamic concurrency limits (`maxConcurrentDownloads`), and lifecycle events.
+  - Implemented download state machine (`pending` -> `downloading` -> `completed` / `failed` / `cancelled` / `paused`), pause/resume cooperative mechanics, retry logic, and remove/clear completed.
+  - Built `DownloadService` in Python worker utilizing `yt-dlp` in execution mode (`download=True`), Windows filename sanitization, path traversal defensive checks, and cooperative `threading.Event` cancellation.
+  - Implemented throttled real-time progress events (`download.progress`) reporting percentage, downloaded/total bytes, speed bytes/sec, and ETA.
+  - Extended shared protocol contracts (`start_download`, `cancel_download`, `pause_download`, and corresponding events) with Zod validation schemas.
+  - Integrated `AnalyzerPage` ("Start Download" and "Add to Queue") and `DownloadsPage` with live progress bars, speed counters, status badges, and action controls.
+  - In accordance with architecture guidelines, SQLite persistence is deferred to Milestone 8.
+  - Verified acceptance: 26/26 Pytest tests passing, 34/34 Vitest tests passing across 7 suites (including full QueueManager state machine tests and worker integration tests), zero TypeScript compilation errors, and successful production build.
 
 ---
 

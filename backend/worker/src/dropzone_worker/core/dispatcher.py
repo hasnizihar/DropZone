@@ -1,13 +1,19 @@
 import logging
-import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional, Callable
-from ..protocol.models import ProtocolMessage, create_response, create_error, create_event
-from ..protocol.errors import ProtocolErrorCode, WorkerProtocolError
+from ..protocol.models import (
+    ProtocolMessage,
+    create_response,
+    create_error,
+    create_event,
+    PROTOCOL_VERSION,
+)
+from ..protocol.errors import WorkerProtocolError, ProtocolErrorCode
+from ..__init__ import __version__
 from .health import WorkerHealthMonitor
 from .lifecycle import WorkerLifecycle
 from ..services.media_analyzer import MediaAnalyzerService
-from .. import __version__, PROTOCOL_VERSION
+from ..services.download_service import DownloadService
 
 logger = logging.getLogger("dropzone_worker")
 
@@ -17,14 +23,16 @@ class CommandDispatcher:
         health: WorkerHealthMonitor,
         lifecycle: WorkerLifecycle,
         analyzer: Optional[MediaAnalyzerService] = None,
+        download_service: Optional[DownloadService] = None,
         write_message_fn: Optional[Callable[[ProtocolMessage], None]] = None,
-        max_workers: int = 2,
+        max_workers: int = 4,
     ):
         self.health = health
         self.lifecycle = lifecycle
         self.analyzer = analyzer or MediaAnalyzerService()
         self.write_message_fn = write_message_fn
-        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="analyzer_worker")
+        self.download_service = download_service or DownloadService(write_event_fn=self._write_event)
+        self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="worker_task")
 
         self._handlers = {
             "hello": self._handle_hello,
@@ -32,7 +40,13 @@ class CommandDispatcher:
             "get_status": self._handle_get_status,
             "shutdown": self._handle_shutdown,
             "analyze_url": self._handle_analyze_url,
+            "start_download": self._handle_start_download,
+            "cancel_download": self._handle_cancel_download,
+            "pause_download": self._handle_pause_download,
         }
+
+    def _write_event(self, event_name: str, payload: Dict[str, Any]):
+        self._safe_write(create_event(event_name, payload))
 
     def dispatch(self, request: ProtocolMessage) -> Optional[ProtocolMessage]:
         self.health.record_request()
@@ -51,6 +65,11 @@ class CommandDispatcher:
             self._dispatch_async_analyze(request)
             return None
 
+        if cmd == "start_download" and self.write_message_fn:
+            # Execute download asynchronously in thread pool to keep protocol responsive
+            self._dispatch_async_download(request)
+            return None
+
         # Synchronous dispatch
         payload = handler(request.payload)
         return create_response(request.id, request.command, payload)
@@ -59,18 +78,15 @@ class CommandDispatcher:
         url = request.payload.get("url")
 
         def _worker_task():
-            # 1. Emit analysis.started event
             self._safe_write(
                 create_event("analysis.started", {"url": url, "requestId": request.id})
             )
 
             try:
                 result = self.analyzer.analyze(url)
-                # 2. Emit response with extracted metadata & formats
                 self._safe_write(
                     create_response(request.id, request.command, result)
                 )
-                # 3. Emit analysis.completed event
                 self._safe_write(
                     create_event(
                         "analysis.completed",
@@ -120,6 +136,42 @@ class CommandDispatcher:
 
         self.executor.submit(_worker_task)
 
+    def _dispatch_async_download(self, request: ProtocolMessage):
+        payload = request.payload or {}
+        job_id = payload.get("jobId")
+        url = payload.get("url")
+        target_dir = payload.get("targetDirectory")
+        format_id = payload.get("formatId")
+        custom_filename = payload.get("customFilename")
+        extract_audio = bool(payload.get("extractAudio", False))
+        audio_format = payload.get("audioFormat", "mp3")
+
+        def _download_task():
+            try:
+                res = self.download_service.execute_download(
+                    job_id=job_id,
+                    url=url,
+                    target_directory=target_dir,
+                    format_id=format_id,
+                    custom_filename=custom_filename,
+                    extract_audio=extract_audio,
+                    audio_format=audio_format,
+                )
+                self._safe_write(create_response(request.id, request.command, res))
+            except WorkerProtocolError as err:
+                self.health.record_error()
+                self._safe_write(
+                    create_error(request.id, err.code, err.message, err.details, command=request.command)
+                )
+            except Exception as exc:
+                self.health.record_error()
+                logger.error(f"Unexpected error in async download for {job_id}: {exc}", exc_info=True)
+                self._safe_write(
+                    create_error(request.id, ProtocolErrorCode.INTERNAL_ERROR, str(exc), command=request.command)
+                )
+
+        self.executor.submit(_download_task)
+
     def _safe_write(self, msg: ProtocolMessage):
         if self.write_message_fn:
             try:
@@ -135,7 +187,16 @@ class CommandDispatcher:
         return {
             "workerVersion": __version__,
             "protocolVersion": PROTOCOL_VERSION,
-            "capabilities": ["ping", "hello", "get_status", "shutdown", "analyze_url"],
+            "capabilities": [
+                "ping",
+                "hello",
+                "get_status",
+                "shutdown",
+                "analyze_url",
+                "start_download",
+                "cancel_download",
+                "pause_download",
+            ],
             "pid": self.health.get_status_payload()["pid"],
             "ytdlpVersion": self.analyzer.engine.version,
         }
@@ -150,8 +211,9 @@ class CommandDispatcher:
     def _handle_get_status(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         status_info = self.health.get_status_payload()
         status_info["ytdlpVersion"] = self.analyzer.engine.version
-        if "analyze_url" not in status_info["capabilities"]:
-            status_info["capabilities"].append("analyze_url")
+        for cap in ["analyze_url", "start_download", "cancel_download", "pause_download"]:
+            if cap not in status_info["capabilities"]:
+                status_info["capabilities"].append(cap)
         return status_info
 
     def _handle_shutdown(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -166,3 +228,28 @@ class CommandDispatcher:
     def _handle_analyze_url(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = payload.get("url")
         return self.analyzer.analyze(url)
+
+    def _handle_start_download(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self.download_service.execute_download(
+            job_id=payload.get("jobId"),
+            url=payload.get("url"),
+            target_directory=payload.get("targetDirectory"),
+            format_id=payload.get("formatId"),
+            custom_filename=payload.get("customFilename"),
+            extract_audio=bool(payload.get("extractAudio", False)),
+            audio_format=payload.get("audioFormat", "mp3"),
+        )
+
+    def _handle_cancel_download(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        job_id = payload.get("jobId")
+        if not job_id:
+            raise WorkerProtocolError(ProtocolErrorCode.VALIDATION_ERROR, "Missing 'jobId' in cancel_download request")
+        cancelled = self.download_service.cancel_download(job_id)
+        return {"jobId": job_id, "cancelled": cancelled, "success": cancelled}
+
+    def _handle_pause_download(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        job_id = payload.get("jobId")
+        if not job_id:
+            raise WorkerProtocolError(ProtocolErrorCode.VALIDATION_ERROR, "Missing 'jobId' in pause_download request")
+        paused = self.download_service.pause_download(job_id)
+        return {"jobId": job_id, "paused": paused, "success": paused}

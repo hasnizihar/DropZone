@@ -35,6 +35,9 @@ Electron Main Process
 | `get_status` | Detailed telemetry & health | `{}` |
 | `shutdown` | Controlled graceful termination | `{"reason": "app_exit"}` |
 | `analyze_url` | Non-blocking media inspection with yt-dlp | `{"url": "https://..."}` |
+| `start_download` | Executes video/audio download via yt-dlp | `{"jobId": "...", "url": "...", "targetDirectory": "..."}` |
+| `cancel_download` | Aborts active download for job | `{"jobId": "..."}` |
+| `pause_download` | Cooperatively pauses active download | `{"jobId": "..."}` |
 
 ---
 
@@ -47,6 +50,12 @@ Electron Main Process
 - `analysis.started`: Fired when a media analysis worker thread starts.
 - `analysis.completed`: Fired upon successful format & metadata extraction.
 - `analysis.failed`: Fired on validation or extraction failure.
+- `download.started`: Fired when a download task begins executing.
+- `download.progress`: Real-time download progress (percentage, bytes, speed, ETA).
+- `download.completed`: Fired on successful file download and postprocessing.
+- `download.failed`: Fired on download failure or network exception.
+- `download.cancelled`: Fired when a download is cancelled by user.
+- `download.paused`: Fired when a download is cooperatively paused.
 
 ---
 

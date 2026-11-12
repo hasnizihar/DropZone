@@ -17,6 +17,10 @@ import {
   WORKER_COMMANDS,
   WORKER_EVENTS,
   AnalyzeUrlResponsePayload,
+  StartDownloadRequestPayload,
+  StartDownloadResponsePayload,
+  CancelDownloadResponsePayload,
+  PauseDownloadResponsePayload,
 } from '@dropzone/shared';
 
 interface PendingRequest {
@@ -163,6 +167,33 @@ export class WorkerManager extends EventEmitter {
     );
   }
 
+  public async startDownload(
+    payload: StartDownloadRequestPayload,
+    timeoutMs = 3600000 // 1 hour default timeout for large file downloads
+  ): Promise<StartDownloadResponsePayload> {
+    return this.sendRequest<StartDownloadResponsePayload>(
+      WORKER_COMMANDS.START_DOWNLOAD,
+      payload,
+      timeoutMs
+    );
+  }
+
+  public async cancelDownload(jobId: string): Promise<CancelDownloadResponsePayload> {
+    return this.sendRequest<CancelDownloadResponsePayload>(
+      WORKER_COMMANDS.CANCEL_DOWNLOAD,
+      { jobId },
+      5000
+    );
+  }
+
+  public async pauseDownload(jobId: string): Promise<PauseDownloadResponsePayload> {
+    return this.sendRequest<PauseDownloadResponsePayload>(
+      WORKER_COMMANDS.PAUSE_DOWNLOAD,
+      { jobId },
+      5000
+    );
+  }
+
   public async getStatus(): Promise<any> {
     if (this.healthMonitor.getState() === 'healthy') {
       try {
@@ -248,6 +279,18 @@ export class WorkerManager extends EventEmitter {
           });
       } else if (event.command === WORKER_EVENTS.SHUTTING_DOWN) {
         console.log('[Worker Event] Worker is shutting down cleanly.');
+      } else if (event.command === WORKER_EVENTS.DOWNLOAD_STARTED) {
+        this.emit('download-started', event.payload);
+      } else if (event.command === WORKER_EVENTS.DOWNLOAD_PROGRESS) {
+        this.emit('download-progress', event.payload);
+      } else if (event.command === WORKER_EVENTS.DOWNLOAD_COMPLETED) {
+        this.emit('download-completed', event.payload);
+      } else if (event.command === WORKER_EVENTS.DOWNLOAD_FAILED) {
+        this.emit('download-failed', event.payload);
+      } else if (event.command === WORKER_EVENTS.DOWNLOAD_CANCELLED) {
+        this.emit('download-cancelled', event.payload);
+      } else if (event.command === WORKER_EVENTS.DOWNLOAD_PAUSED) {
+        this.emit('download-paused', event.payload);
       }
       this.emit('worker-event', event);
     }

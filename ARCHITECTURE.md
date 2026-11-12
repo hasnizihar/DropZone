@@ -147,3 +147,19 @@ Dispatcher Event / Response Emitter
 
 ### 4.3 Format Classification & Size Fidelity
 Formats are cleanly categorized into `isCombined` (audio + video), `isVideo` (video stream only), and `isAudio` (audio stream only). Exact sizes (`filesize`) and estimated sizes (`filesize_approx`) are strictly segregated to avoid misleading the user with inaccurate file sizes.
+
+---
+
+## 5. Download Queue & Scheduler Architecture (Milestone 4)
+
+### 5.1 Single Authority Queue Management
+Electron Main's `QueueManager` is the single authority for queue order, state transitions, and concurrency management. React renders state and triggers user actions; the Python worker performs file transfer and post-processing without maintaining queue state.
+
+### 5.2 Concurrency & Scheduler Model
+- Concurrency limit is dynamically controlled by `maxConcurrentDownloads` (default: 3).
+- Active jobs are tracked in an in-memory set (`activeJobIds`).
+- Pending jobs are scheduled via FIFO queue order.
+- When an active download completes, fails, pauses, or cancels, its concurrency slot is freed, and the next eligible pending job is immediately scheduled.
+
+### 5.3 Progress Throttling & Stdio Safety
+Download progress callbacks inside `yt-dlp` are throttled to a maximum of 4 events per second (250ms interval) per active job. All stdout writes are guarded by an inter-thread lock, preventing interleaved JSON Lines and protecting IPC protocol integrity.

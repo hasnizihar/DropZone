@@ -4,6 +4,7 @@ import fs from 'fs';
 import { IPC_CHANNELS } from '../ipc/channels';
 import { getSystemEnginesReport } from './engines';
 import { WorkerManager } from '../worker/WorkerManager';
+import { QueueManager } from '../queue/QueueManager';
 import type {
   AppSettings,
   DownloadJob,
@@ -37,8 +38,12 @@ let appSettings: AppSettings = {
   loggingLevel: 'info',
 };
 
-// In-memory job repository for foundation (SQLite layer in Milestone 4)
-const jobsMap = new Map<string, DownloadJob>();
+// Queue Manager (Milestone 4 - Authoritative scheduler & in-memory queue state)
+const queueManager = new QueueManager(workerManager, {
+  maxConcurrentDownloads: appSettings.maxConcurrentDownloads,
+  autoStartDownloads: appSettings.autoStartDownloads,
+  defaultDownloadDir: appSettings.defaultDownloadDir,
+});
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
@@ -155,6 +160,11 @@ function setupIpcHandlers() {
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_UPDATE, (_event, partialSettings: Partial<AppSettings>) => {
     appSettings = { ...appSettings, ...partialSettings };
+    queueManager.updateSettings(
+      appSettings.maxConcurrentDownloads,
+      appSettings.autoStartDownloads,
+      appSettings.defaultDownloadDir
+    );
     return appSettings;
   });
 
@@ -211,101 +221,47 @@ function setupIpcHandlers() {
     }
   });
 
-  // Job Management
+  // Job Management (Milestone 4 - Powered by authoritative QueueManager)
   ipcMain.handle(IPC_CHANNELS.DOWNLOADS_ADD, (_event, options: CreateDownloadOptions) => {
-    const id = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const newJob: DownloadJob = {
-      id,
-      url: options.url,
-      title: options.customFilename || options.url.split('/').pop()?.split('?')[0] || 'Download Job',
-      source: 'web',
-      category: options.category || 'video',
-      engine: 'yt-dlp',
-      status: 'pending',
-      selectedFormatId: options.selectedFormatId || 'best',
-      targetDirectory: options.targetDirectory || appSettings.defaultDownloadDir,
-      progress: 0,
-      downloadedBytes: 0,
-      totalBytes: 0,
-      speedBytesPerSec: 0,
-      etaSeconds: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    jobsMap.set(id, newJob);
-    return { success: true, job: newJob };
+    try {
+      const job = queueManager.addJob(options);
+      return { success: true, job };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.DOWNLOADS_GET_ALL, () => {
-    return Array.from(jobsMap.values());
+    return queueManager.getAllJobs();
   });
 
-  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_PAUSE, (_event, jobId: string) => {
-    const job = jobsMap.get(jobId);
-    if (job) {
-      job.status = 'paused';
-      job.updatedAt = new Date().toISOString();
-      return { success: true };
-    }
-    return { success: false, error: 'Job not found' };
+  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_PAUSE, async (_event, jobId: string) => {
+    const success = await queueManager.pauseJob(jobId);
+    return { success };
   });
 
-  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_RESUME, (_event, jobId: string) => {
-    const job = jobsMap.get(jobId);
-    if (job) {
-      job.status = 'downloading';
-      job.updatedAt = new Date().toISOString();
-      return { success: true };
-    }
-    return { success: false, error: 'Job not found' };
+  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_RESUME, async (_event, jobId: string) => {
+    const success = await queueManager.resumeJob(jobId);
+    return { success };
   });
 
-  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_CANCEL, (_event, jobId: string) => {
-    const job = jobsMap.get(jobId);
-    if (job) {
-      job.status = 'cancelled';
-      job.updatedAt = new Date().toISOString();
-      return { success: true };
-    }
-    return { success: false, error: 'Job not found' };
+  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_CANCEL, async (_event, jobId: string) => {
+    const success = await queueManager.cancelJob(jobId);
+    return { success };
   });
 
-  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_RETRY, (_event, jobId: string) => {
-    const job = jobsMap.get(jobId);
-    if (job) {
-      job.status = 'pending';
-      job.progress = 0;
-      job.updatedAt = new Date().toISOString();
-      return { success: true };
-    }
-    return { success: false, error: 'Job not found' };
+  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_RETRY, async (_event, jobId: string) => {
+    const success = await queueManager.retryJob(jobId);
+    return { success };
   });
 
-  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_REMOVE, (_event, jobId: string, deleteFile = false) => {
-    const job = jobsMap.get(jobId);
-    if (job) {
-      if (deleteFile && job.outputPath && fs.existsSync(job.outputPath)) {
-        try {
-          fs.unlinkSync(job.outputPath);
-        } catch (e) {
-          console.error('Failed to delete file:', e);
-        }
-      }
-      jobsMap.delete(jobId);
-      return { success: true };
-    }
-    return { success: false, error: 'Job not found' };
+  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_REMOVE, async (_event, jobId: string, deleteFile = false) => {
+    const success = await queueManager.removeJob(jobId, deleteFile);
+    return { success };
   });
 
   ipcMain.handle(IPC_CHANNELS.DOWNLOADS_CLEAR_COMPLETED, () => {
-    let count = 0;
-    for (const [id, job] of jobsMap.entries()) {
-      if (job.status === 'completed' || job.status === 'cancelled') {
-        jobsMap.delete(id);
-        count++;
-      }
-    }
+    const count = queueManager.clearCompleted();
     return { success: true, count };
   });
 
@@ -370,27 +326,8 @@ function setupIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.BATCH_START, (_event, items: CreateDownloadOptions[]) => {
     const jobIds: string[] = [];
     for (const item of items) {
-      const id = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const newJob: DownloadJob = {
-        id,
-        url: item.url,
-        title: item.customFilename || item.url.split('/').pop()?.split('?')[0] || 'Download Job',
-        source: 'web',
-        category: item.category || 'video',
-        engine: 'yt-dlp',
-        status: 'pending',
-        selectedFormatId: item.selectedFormatId || 'best',
-        targetDirectory: item.targetDirectory || appSettings.defaultDownloadDir,
-        progress: 0,
-        downloadedBytes: 0,
-        totalBytes: 0,
-        speedBytesPerSec: 0,
-        etaSeconds: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      jobsMap.set(id, newJob);
-      jobIds.push(id);
+      const job = queueManager.addJob(item);
+      jobIds.push(job.id);
     }
     return { success: true, jobIds };
   });
@@ -464,6 +401,37 @@ app.whenReady().then(async () => {
       mainWindow.webContents.send(IPC_CHANNELS.EVENT_ANALYSIS_COMPLETED, event.payload);
     } else if (event.command === 'analysis.failed') {
       mainWindow.webContents.send(IPC_CHANNELS.EVENT_ANALYSIS_FAILED, event.payload);
+    }
+  });
+
+  // Forward QueueManager lifecycle and progress events to renderer
+  queueManager.on('job-progress', (job) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_DOWNLOAD_PROGRESS, job);
+    }
+  });
+
+  queueManager.on('job-completed', (job) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_DOWNLOAD_COMPLETED, job);
+    }
+  });
+
+  queueManager.on('job-failed', (job) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_DOWNLOAD_FAILED, job);
+    }
+  });
+
+  queueManager.on('job-updated', (job) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_DOWNLOAD_PROGRESS, job);
+    }
+  });
+
+  queueManager.on('job-added', (job) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_DOWNLOAD_PROGRESS, job);
     }
   });
 

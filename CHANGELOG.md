@@ -2,6 +2,17 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.4] - 2026-11-12
+
+### Added
+- **Core Downloads Execution Engine**: Implemented `DownloadService` in Python worker powered by `yt-dlp` in execution mode (`download=True`) with audio extraction post-processing (`FFmpegExtractAudio`).
+- **Authoritative QueueManager**: Built centralized `QueueManager` in Electron Main enforcing FIFO scheduling, dynamic concurrency limits (`maxConcurrentDownloads`), and complete state machine transitions (`pending`, `downloading`, `paused`, `completed`, `failed`, `cancelled`).
+- **Cooperative Cancellation & Pause**: Integrated thread-safe cancellation tokens (`threading.Event`) inside yt-dlp progress hooks for instantaneous cancellation and safe pause reserving `.part` files.
+- **Throttled Live Progress Telemetry**: Throttled progress event dispatching (max 4 events/sec per job) reporting percentage, downloaded/total bytes, speed bytes/sec, and ETA.
+- **Protocol Extension**: Extended protocol commands (`start_download`, `cancel_download`, `pause_download`) and events (`download.started`, `download.progress`, `download.completed`, `download.failed`, `download.cancelled`, `download.paused`) with Zod validation.
+- **Downloads UI & Analyzer Wiring**: Connected "Start Download" and "Add to Queue" actions in `AnalyzerPage` to live queue execution, and connected `DownloadsPage` with live progress bars, pause/resume/cancel controls, and speed counters.
+- **Comprehensive Testing**: Added 4 new Python unit tests (26 total) and 7 new Vitest tests (34 total) covering QueueManager scheduling, concurrency bounds, pause/resume/retry lifecycle, and worker integration.
+
 ## [1.0.0-alpha.3] - 2026-11-12
 
 ### Added

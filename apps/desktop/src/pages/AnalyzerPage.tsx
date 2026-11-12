@@ -51,6 +51,7 @@ export const AnalyzerPage: React.FC = () => {
   const inspectUrl = useAppStore((state) => state.inspectUrl);
   const resetAnalysis = useAppStore((state) => state.resetAnalysis);
   const addJob = useAppStore((state) => state.addJob);
+  const setActiveTab = useAppStore((state) => state.setActiveTab);
   const settings = useAppStore((state) => state.settings);
   const selectDownloadDirectory = useAppStore((state) => state.selectDownloadDirectory);
   const showToast = useAppStore((state) => state.showToast);
@@ -87,12 +88,20 @@ export const AnalyzerPage: React.FC = () => {
     }
   };
 
-  const handleQueueOrDownloadAction = (actionName: string) => {
+  const handleStartDownload = async (action: 'start' | 'queue') => {
     if (!analyzedMedia) return;
-    showToast(
-      `Format [${selectedFormatId || 'optimal'}] selected. Download queue & execution engine activates in Milestone 4.`,
-      'info'
-    );
+    const isAudio = analyzedMedia.metadata?.mediaType === 'audio' || selectedFormat?.isAudio;
+    const ok = await addJob({
+      url: analyzedMedia.url,
+      selectedFormatId: selectedFormatId || undefined,
+      customFilename: customFilename.trim() || analyzedMedia.title,
+      targetDirectory: targetDir || settings.defaultDownloadDir,
+      category: isAudio ? 'file' : analyzedMedia.category,
+    });
+    if (ok) {
+      showToast(action === 'start' ? 'Download started!' : 'Added to download queue', 'success');
+      setActiveTab('downloads');
+    }
   };
 
   const allFormats: MediaFormat[] = analyzedMedia?.formats || [];
@@ -449,14 +458,14 @@ export const AnalyzerPage: React.FC = () => {
             {/* Action Buttons & Milestone Notice */}
             <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => handleQueueOrDownloadAction('start')}
+                onClick={() => handleStartDownload('start')}
                 className="flex-1 py-3 bg-brand-lime text-brand-black font-bold rounded-lg text-sm hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 shadow-sm"
               >
                 <Download className="w-4 h-4" />
-                <span>Select Format for Download</span>
+                <span>Start Download</span>
               </button>
               <button
-                onClick={() => handleQueueOrDownloadAction('queue')}
+                onClick={() => handleStartDownload('queue')}
                 className="px-6 py-3 bg-brand-surface border border-brand-border text-brand-white font-semibold rounded-lg text-sm hover:bg-brand-black transition-colors flex items-center justify-center space-x-2"
               >
                 <Plus className="w-4 h-4" />
@@ -465,7 +474,7 @@ export const AnalyzerPage: React.FC = () => {
             </div>
 
             <div className="text-[11px] text-brand-grey/80 text-center pt-1 font-mono">
-              Milestone 3 active: Media format discovery & inspection complete. Download execution engine connects in Milestone 4.
+              Milestone 4 active: Download queue state machine & concurrent scheduler connected to Python worker.
             </div>
           </div>
         </div>

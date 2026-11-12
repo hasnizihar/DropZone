@@ -21,10 +21,11 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - The worker protocol strictly rejects any command not defined in its dispatcher table (`UNKNOWN_COMMAND`).
    - Line length limits (2MB maximum) protect against memory exhaustion from oversized payloads.
 
-4. **Filesystem & Path Security**
+4. **Filesystem & Path Security (Milestone 4)**
    - Download destination paths are normalized to prevent path traversal (`..` escapes).
-   - Filenames are sanitized, stripping invalid Windows characters (`\ / : * ? " < > |`) and control characters.
-   - Downloaded files are never automatically executed upon completion.
+   - Filenames are strictly sanitized via `sanitize_filename`, stripping invalid Windows characters (`\ / : * ? " < > | \0`), trimming trailing dots and whitespace, and bounding length to 180 characters.
+   - Partial downloads use `.part` extensions and are never automatically executed upon completion.
+   - User cancellation safely terminates in-flight writers without leaving corrupted target destination locks.
 
 5. **Credential & Privacy Protection**
    - Worker stdout is reserved for protocol messages; all logging goes to stderr.

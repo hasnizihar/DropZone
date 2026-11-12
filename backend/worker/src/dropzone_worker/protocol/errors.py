@@ -21,6 +21,12 @@ class ProtocolErrorCode:
     ANALYSIS_TIMEOUT = "ANALYSIS_TIMEOUT"
     UNKNOWN_ERROR = "UNKNOWN_ERROR"
 
+    # Download Execution Error Codes (Milestone 4)
+    DOWNLOAD_FAILED = "DOWNLOAD_FAILED"
+    DOWNLOAD_CANCELLED = "DOWNLOAD_CANCELLED"
+    DOWNLOAD_ABORTED = "DOWNLOAD_ABORTED"
+    FILE_WRITE_ERROR = "FILE_WRITE_ERROR"
+
 class WorkerProtocolError(Exception):
     def __init__(self, code: str, message: str, details: dict = None):
         super().__init__(message)

@@ -4,6 +4,9 @@ export const WORKER_COMMANDS = {
   GET_STATUS: 'get_status',
   SHUTDOWN: 'shutdown',
   ANALYZE_URL: 'analyze_url',
+  START_DOWNLOAD: 'start_download',
+  CANCEL_DOWNLOAD: 'cancel_download',
+  PAUSE_DOWNLOAD: 'pause_download',
 } as const;
 
 export type WorkerCommandName = typeof WORKER_COMMANDS[keyof typeof WORKER_COMMANDS] | string;
@@ -50,4 +53,41 @@ export interface ShutdownResponsePayload {
   shuttingDown: boolean;
   reason?: string;
 }
+
+export interface StartDownloadRequestPayload {
+  jobId: string;
+  url: string;
+  formatId?: string;
+  targetDirectory: string;
+  customFilename?: string;
+  extractAudio?: boolean;
+  audioFormat?: 'mp3' | 'm4a' | 'wav' | 'flac';
+}
+
+export interface StartDownloadResponsePayload {
+  success: boolean;
+  jobId: string;
+  outputPath?: string;
+}
+
+export interface CancelDownloadRequestPayload {
+  jobId: string;
+}
+
+export interface CancelDownloadResponsePayload {
+  jobId: string;
+  cancelled: boolean;
+  success: boolean;
+}
+
+export interface PauseDownloadRequestPayload {
+  jobId: string;
+}
+
+export interface PauseDownloadResponsePayload {
+  jobId: string;
+  paused: boolean;
+  success: boolean;
+}
+
 

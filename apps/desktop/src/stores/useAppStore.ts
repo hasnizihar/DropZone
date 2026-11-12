@@ -137,9 +137,17 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       // Register live listeners
       window.dropzone.onDownloadProgress((updatedJob) => {
-        set((state) => ({
-          jobs: state.jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j)),
-        }));
+        set((state) => {
+          const exists = state.jobs.some((j) => j.id === updatedJob.id);
+          if (exists) {
+            return {
+              jobs: state.jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j)),
+            };
+          }
+          return {
+            jobs: [updatedJob, ...state.jobs],
+          };
+        });
       });
 
       window.dropzone.onDownloadCompleted((completedJob) => {
