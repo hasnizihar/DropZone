@@ -13,7 +13,7 @@
 - [x] Batch & Playlist Processing (Milestone 6)
 - [x] FFmpeg Stream Merging & Audio Conversion (Milestone 7)
 - [x] Settings Persistence & History Management (Milestone 8)
-- [ ] End-to-End Testing & Crash Recovery Hardening (Milestone 9)
+- [x] QA & Fault-Tolerance Hardening (Milestone 9)
 - [ ] Windows NSIS Installer & Portable Executable (Milestone 10)
 
 ## Future Considerations (Post-1.0)

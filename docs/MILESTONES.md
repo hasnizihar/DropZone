@@ -150,12 +150,35 @@ This document tracks progress through the 10 core milestones defined in the DROP
 
 ---
 
-## Milestone 9: Quality Assurance & Hardening
-- **Status:** Pending
+## Milestone 9: QA & Fault-Tolerance Hardening
+- **Status:** Complete (Commit `[Current Commit]`)
 - **Scope:**
-  - Automated test execution across frontend (`vitest`) and backend (`pytest`).
-  - Worker crash recovery simulation.
-  - Edge case handling (offline, slow connection, invalid URLs, path traversal protection).
+  - Comprehensive quality assurance, reliability, security, and fault-tolerance hardening pass across all application subsystems.
+  - Queue state machine transition guards:
+    - Strict status checks preventing invalid pause on terminal states (`completed`, `failed`, `cancelled`).
+    - Guard against invalid resume on non-paused jobs (`downloading`, `pending`, `completed`, `failed`).
+    - Guard against invalid retry on active jobs; partial container retry re-queuing only failed/cancelled children while preserving completed children.
+    - Idempotent safe no-op on duplicate cancellations.
+    - Hard concurrency ceiling enforcement (`activeJobIds.size < maxConcurrentDownloads`) under rapid scheduling race conditions.
+  - Late worker event shields:
+    - Electron Main automatically rejects late progress, completion, failure, or cancellation events arriving after terminal states (`completed`, `cancelled`, `failed`), preventing UI telemetry regression and state corruption.
+  - Database persistence serialization & atomic safety:
+    - Added `hasPendingSave` flag in `DatabaseManager` to serialize rapid overlapping disk flushes without dropping writes.
+    - Added `.tmp` staging file cleanup on failed write or rename error.
+  - Network & filesystem error classification in Python worker:
+    - Fixed `requests.Response` boolean evaluation bug in `direct_http_service` and `direct_stream_engine` (`if last_response is None:` instead of `if not last_response:`).
+    - Mapped HTTP 429 to `ProtocolErrorCode.RATE_LIMITED`, HTTP 401/403 to `ProtocolErrorCode.AUTH_REQUIRED`, HTTP 500–504 to `ProtocolErrorCode.NETWORK_ERROR`.
+    - Mapped disk full and write `OSError` to `ProtocolErrorCode.FILE_WRITE_ERROR`.
+  - SSRF & redirect security regression verification:
+    - Blocked redirect to cloud metadata (`169.254.169.254`, `fd00:ec2::254`).
+    - Blocked redirect to localhost / private RFC 1918 IPs (`127.0.0.1`, `10.0.0.1`, `192.168.1.1`).
+    - Blocked insecure HTTPS-to-HTTP protocol downgrades and redirect loops (> 5 hops).
+  - Subprocess & path resolution hardening:
+    - Multi-level parent directory candidate search for Python worker root and executable on Windows.
+    - Graceful process tree termination and PSUtil cleanup.
+  - Electron runtime smoke testing:
+    - Automated runtime smoke test script (`scripts/smoke-test.cjs` / `npm run smoke:electron`) verifying that Electron main, SQLite database, Settings, History, and Python Worker launch, connect, and shut down cleanly with exit code 0.
+  - Verified acceptance: 56/56 Pytest tests passing, 83/83 Vitest tests passing across 13 test files, 0 TypeScript errors, clean production bundle, and verified Electron runtime smoke test.
 
 ---
 

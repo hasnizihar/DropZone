@@ -65,3 +65,10 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - Physical file deletion is strictly segregated from database record removal: deleting a history record leaves the downloaded file intact on disk. Physical file deletion requires explicit user confirmation and validates paths to ensure only targeted download files are unlinked.
    - Sensitive credentials, passwords, and authorization tokens are strictly forbidden from being stored in the SQLite database.
    - Database files are stored exclusively in the application's isolated `userData` directory, preventing source repository pollution or unauthorized file placement.
+
+10. **Fault-Tolerance Hardening & State Integrity (Milestone 9)**
+   - Terminal State Idempotency: `QueueManager` discards late progress, completion, failure, or cancellation events arriving after terminal states (`completed`, `cancelled`, `failed`), preventing UI telemetry regression and state corruption.
+   - Database Write Serialization: `DatabaseManager` serializes overlapping `saveImmediately()` calls using a pending save queue (`hasPendingSave`), ensuring rapid state mutations are flushed to disk without race-condition data loss.
+   - SSRF & Redirect Boundary Testing: Automated regression suites verify that redirects to cloud metadata (`169.254.169.254`, `fd00:ec2::254`), private IP subnets, and loopback are blocked, and HTTPS-to-HTTP scheme downgrades are rejected.
+   - Subprocess Command Safety Audit: Confirmed 0 occurrences of `shell=True`, `eval()`, or `exec()` in production code. All subprocess calls (Python worker, FFmpeg, FFprobe) pass discrete argument arrays.
+   - Safe Atomic Finalization: Staging files (`.tmp`) are cleaned up immediately upon filesystem error, and final files are renamed only after full verification.

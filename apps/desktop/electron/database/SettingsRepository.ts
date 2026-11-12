@@ -79,3 +79,4 @@ export class SettingsRepository {
     return { ...DEFAULT_SETTINGS };
   }
 }
+

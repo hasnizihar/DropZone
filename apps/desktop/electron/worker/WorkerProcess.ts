@@ -22,12 +22,34 @@ export class WorkerProcess {
     this.options = options;
   }
 
+  public static resolveWorkerRoot(workerRoot?: string): string {
+    if (workerRoot && fs.existsSync(workerRoot)) {
+      return workerRoot;
+    }
+    const candidates = [
+      path.resolve(__dirname, '../../../../backend/worker'),
+      path.resolve(__dirname, '../../../backend/worker'),
+      path.resolve(process.cwd(), 'backend/worker'),
+      path.resolve(process.cwd(), '../../backend/worker'),
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) {
+        return c;
+      }
+    }
+    return candidates[0];
+  }
+
   public static resolvePythonExecutable(customPath?: string, workerRoot?: string): string {
     if (customPath && fs.existsSync(customPath)) {
       return customPath;
     }
 
-    const baseRoot = workerRoot || path.resolve(__dirname, '../../../backend/worker');
+    if (process.env.DROPZONE_PYTHON_PATH && fs.existsSync(process.env.DROPZONE_PYTHON_PATH)) {
+      return process.env.DROPZONE_PYTHON_PATH;
+    }
+
+    const baseRoot = WorkerProcess.resolveWorkerRoot(workerRoot);
 
     // Check project virtualenv
     const isWin = process.platform === 'win32';
@@ -41,6 +63,24 @@ export class WorkerProcess {
       return venvPythonUnix;
     }
 
+    // On Windows, check common Python installation paths before bare 'python'
+    if (isWin) {
+      const localAppData = process.env.LOCALAPPDATA || '';
+      const versions = ['Python312', 'Python311', 'Python310', 'Python313', 'Python39'];
+      for (const ver of versions) {
+        const candidate = path.join(localAppData, 'Programs', 'Python', ver, 'python.exe');
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      }
+      for (const ver of versions) {
+        const candidate = path.join('C:\\Program Files', ver, 'python.exe');
+        if (fs.existsSync(candidate)) {
+          return candidate;
+        }
+      }
+    }
+
     // Default to system python command
     return isWin ? 'python' : 'python3';
   }
@@ -50,7 +90,7 @@ export class WorkerProcess {
       throw new Error('Worker process is already running.');
     }
 
-    const workerRoot = this.options.workerRoot || path.resolve(__dirname, '../../../backend/worker');
+    const workerRoot = WorkerProcess.resolveWorkerRoot(this.options.workerRoot);
     const pythonExecutable = WorkerProcess.resolvePythonExecutable(this.options.customPythonPath, workerRoot);
     const workerSrc = path.join(workerRoot, 'src');
 

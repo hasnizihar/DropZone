@@ -15,6 +15,7 @@ DROPZONE is a high-performance, modular desktop application designed for downloa
 - **Queue & Concurrency Management**: Authoritative job state machine (`pending`, `analyzing`, `ready`, `downloading`, `paused`, `completed`, `failed`, `cancelled`) with configurable concurrency (default: 3).
 - **FFmpeg Post-Processing & Audio Extraction**: Audio extraction (MP3, M4A, WAV, FLAC, OPUS) with selectable bitrates, video remuxing (MP4, MKV, WebM, MOV) with stream copying, audio/video stream merging, metadata tagging, and cover art embedding.
 - **SQLite Settings & Download History**: Durable local-first SQLite persistence (`dropzone.db`) via WebAssembly, versioned migrations, startup queue hydration & crash recovery, preferences persistence with factory reset, and searchable, filterable, paginated download history.
+- **Hardened Fault-Tolerance & Reliability**: Terminal state idempotency, late worker event shields, concurrent database save serialization, network error normalization, and SSRF/redirect defense regression verification.
 - **Local-First & Secure**: Strict Electron sandboxing, context isolation, zero remote telemetry, local SQLite persistence, and path traversal protection.
 
 ---
@@ -70,10 +71,13 @@ npm run dev
 ## Testing
 
 ```bash
-# Run Vitest unit & component tests
+# Run Vitest unit, state machine, and fault-tolerance tests
 npm test
 
-# Run Python worker tests
+# Run Python worker & network fault-injection tests
 npm run test:python
+
+# Run Electron runtime smoke test
+npm run smoke:electron
 ```
 

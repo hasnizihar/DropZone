@@ -10,7 +10,8 @@
     "dev": "npm run dev --workspace=@dropzone/desktop",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:python": "python -m pytest backend/worker/tests -v"
+    "test:python": "python -m pytest backend/worker/tests -v",
+    "smoke:electron": "node scripts/smoke-test.cjs"
   },
   "overrides": {
     "rollup": "npm:@rollup/wasm-node@^4.68.2"

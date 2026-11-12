@@ -680,9 +680,22 @@ app.whenReady().then(async () => {
   });
 
   // Start background worker
-  workerManager.start().catch((err) => {
-    console.error('[Worker Boot Error]', err);
-  });
+  workerManager
+    .start()
+    .then(() => {
+      if (process.env.DROPZONE_SMOKE_TEST === 'true') {
+        console.log('[SMOKE_TEST_SUCCESS] Main process, SQLite database, Settings, History, and Python Worker initialized cleanly.');
+        setTimeout(() => {
+          app.quit();
+        }, 1000);
+      }
+    })
+    .catch((err) => {
+      console.error('[Worker Boot Error]', err);
+      if (process.env.DROPZONE_SMOKE_TEST === 'true') {
+        process.exit(1);
+      }
+    });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

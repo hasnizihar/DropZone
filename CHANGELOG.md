@@ -2,6 +2,29 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.9] - 2026-11-13
+
+### Added
+- **Queue State Machine Guards & Terminal State Idempotency**:
+  - Implemented strict transition guards in `QueueManager` preventing invalid operations on terminal jobs (pausing completed/failed jobs, resuming unpaused jobs, retrying active jobs).
+  - Added late worker event shields discarding delayed progress, completion, failure, and cancellation events after jobs enter `completed`, `cancelled`, or `failed` states.
+  - Enforced strict concurrency limits (`activeJobIds.size < maxConcurrentDownloads`) preventing race conditions under rapid asynchronous triggers.
+- **Database Persistence Serialization & Atomic Cleanup**:
+  - Added `hasPendingSave` flag in `DatabaseManager` ensuring overlapping `saveImmediately()` calls queue successive disk flushes without dropping writes.
+  - Added automatic unlinking of `.tmp` staging files when disk write or atomic rename encounters filesystem errors.
+- **Network & Filesystem Error Categorization**:
+  - Fixed a critical Python `requests` boolean check defect in `direct_http_service` and `direct_stream_engine` where `if not response:` incorrectly intercepted all HTTP 4xx/5xx responses as "no response".
+  - Mapped HTTP 429 to `RATE_LIMITED`, HTTP 401/403 to `AUTH_REQUIRED`, HTTP 500–504 to `NETWORK_ERROR`, and disk write `OSError` to `FILE_WRITE_ERROR`.
+- **SSRF & Security Defense-in-Depth Regression Suites**:
+  - Built comprehensive regression tests verifying redirection protection against cloud metadata (`169.254.169.254`, `fd00:ec2::254`), localhost, private RFC 1918 subnets, and protocol downgrades.
+- **Windows Subprocess & Path Resolution Hardening**:
+  - Added multi-level candidate fallback search for Python worker roots and standard Windows Python installations (`%LOCALAPPDATA%\Programs\Python\Python3*`, `C:\Program Files\Python3*`).
+- **Electron Runtime Smoke Testing**:
+  - Implemented automated runtime smoke test script (`scripts/smoke-test.cjs` / `npm run smoke:electron`) that sanitizes parent environment overrides (`ELECTRON_RUN_AS_NODE`), boots Electron in real GUI mode, verifies database initialization, settings loading, worker handshake, and exits cleanly with code 0.
+- **Comprehensive Quality Assurance Suites**:
+  - Added 13 Vitest fault-tolerance tests (`faultTolerance.test.ts`) bringing the Vitest suite to 83 tests passing across 13 test files.
+  - Added 4 Pytest fault-tolerance tests (`test_fault_tolerance.py`) bringing the Pytest suite to 56 tests passing.
+
 ## [1.0.0-alpha.8] - 2026-11-13
 
 ### Added

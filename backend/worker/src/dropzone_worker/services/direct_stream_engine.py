@@ -190,7 +190,7 @@ class DirectStreamEngine:
                 response = resp
                 break
 
-            if not response:
+            if response is None:
                 raise WorkerProtocolError(ProtocolErrorCode.NETWORK_ERROR, "No response from download stream.")
 
             status_code = response.status_code
@@ -226,10 +226,26 @@ class DirectStreamEngine:
                     status_code = response.status_code
 
             if status_code not in (200, 206):
-                raise WorkerProtocolError(
-                    ProtocolErrorCode.DOWNLOAD_FAILED,
-                    f"HTTP error {status_code} during download stream."
-                )
+                if status_code == 429:
+                    raise WorkerProtocolError(
+                        ProtocolErrorCode.RATE_LIMITED,
+                        f"Rate limited by server (HTTP 429) for '{current_req_url}'."
+                    )
+                elif status_code in (401, 403):
+                    raise WorkerProtocolError(
+                        ProtocolErrorCode.AUTH_REQUIRED,
+                        f"Access forbidden or authentication required (HTTP {status_code}) for '{current_req_url}'."
+                    )
+                elif status_code in (500, 502, 503, 504):
+                    raise WorkerProtocolError(
+                        ProtocolErrorCode.NETWORK_ERROR,
+                        f"Remote server error (HTTP {status_code}) for '{current_req_url}'."
+                    )
+                else:
+                    raise WorkerProtocolError(
+                        ProtocolErrorCode.DOWNLOAD_FAILED,
+                        f"HTTP error {status_code} during download stream."
+                    )
 
             # Determine mode
             if status_code == 206:
@@ -375,7 +391,10 @@ class DirectStreamEngine:
         except Exception as exc:
             if not isinstance(exc, WorkerProtocolError):
                 logger.error(f"Direct stream failed for {job_id}: {exc}", exc_info=True)
-                exc = WorkerProtocolError(ProtocolErrorCode.DOWNLOAD_FAILED, str(exc))
+                if isinstance(exc, OSError):
+                    exc = WorkerProtocolError(ProtocolErrorCode.FILE_WRITE_ERROR, f"Filesystem write error: {exc}")
+                else:
+                    exc = WorkerProtocolError(ProtocolErrorCode.DOWNLOAD_FAILED, str(exc))
 
             if self.write_event_fn:
                 self.write_event_fn(

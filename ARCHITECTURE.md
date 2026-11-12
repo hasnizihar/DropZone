@@ -273,3 +273,34 @@ Direct file downloads stream network bytes directly to disk in bounded 64 KB chu
   - Parent container jobs aggregate restored child states and recompute completed counts and progress.
 - **Direct Retry**: Retrying an interrupted processing job reuses the local `sourcePath` directly without re-downloading.
 
+---
+
+## 10. QA & Fault-Tolerance Hardening Architecture (Milestone 9)
+
+### 10.1 State Machine Purity & Late Worker Event Shields
+In asynchronous multi-process architectures (Electron Main communicating with a Python worker subprocess over standard I/O), worker events can arrive after a download or processing task has transitioned to a terminal state in the main process.
+- **Terminal State Inviolability**: Once a job enters `completed`, `cancelled`, or `failed`, late worker events (`download.progress`, `download.completed`, `download.failed`, `download.cancelled`, `postprocess.progress`, `postprocess.failed`) are safely discarded by `QueueManager`.
+- **Manual Control Transition Guards**: Strict verification prevents invalid transitions (e.g. attempting to pause completed/failed jobs, resuming unpaused jobs, retrying active jobs).
+- **Concurrency Ceiling Enforcement**: Rapid asynchronous scheduling race conditions cannot exceed `maxConcurrentDownloads`.
+- **Partial Retries**: Retrying a container job resets only failed or cancelled child jobs; completed child assets are never re-downloaded.
+
+### 10.2 Database Persistence Serialization & Atomic Safety
+- **Serialized Disk Flushes**: In `DatabaseManager`, rapid concurrent `saveImmediately()` calls set `hasPendingSave`. Successive disk flushes are queued rather than dropped, eliminating race conditions during fast concurrent writes.
+- **Staging Cleanup**: If `fs.writeFileSync` or `fs.renameSync` fails, temporary `.tmp` database files are unlinked, preventing disk pollution.
+
+### 10.3 Network & HTTP Error Normalization
+- **Requests Library Boolean Correction**: Fixed a critical defect where `if not response:` evaluated to `True` for any HTTP status >= 400 (due to Python requests' `Response.__bool__` returning `self.ok`). Replaced with `if response is None:` across inspection and streaming engines.
+- **Protocol Error Classification**: HTTP 429 maps to `RATE_LIMITED`, HTTP 401/403 maps to `AUTH_REQUIRED`, HTTP 500–504 maps to `NETWORK_ERROR`, and filesystem write/disk-full `OSError` maps to `FILE_WRITE_ERROR`.
+
+### 10.4 SSRF & Redirect Defense-in-Depth
+- Automated regression test suites verify that redirects to AWS/GCP/Azure cloud metadata (`169.254.169.254`, `fd00:ec2::254`), localhost, loopback (`127.0.0.1`, `::1`), and private RFC 1918 addresses (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) are blocked with `INVALID_URL`.
+- Insecure protocol downgrades (HTTPS → HTTP during redirects) and redirect loops (> 5 hops) are blocked with `NETWORK_ERROR`.
+
+### 10.5 Subprocess & Windows Path Resolution Hardening
+- Windows path resolution dynamically probes multi-level candidate roots (`../../../../backend/worker`, `backend/worker`) and Windows Python install paths (`%LOCALAPPDATA%\Programs\Python\Python3*`, `C:\Program Files\Python3*`), preventing subprocess `ENOENT` spawn failures.
+- Child processes are tracked and cleanly terminated across Windows process trees via `psutil` and bounded timeouts.
+
+### 10.6 Electron Runtime Smoke Testing Harness
+- Provided `scripts/smoke-test.cjs` (`npm run smoke:electron`) which strips `ELECTRON_RUN_AS_NODE` environment overrides, boots Electron in full GUI mode, verifies database initialization, settings loading, worker handshake, and cleanly exits with code 0.
+
+

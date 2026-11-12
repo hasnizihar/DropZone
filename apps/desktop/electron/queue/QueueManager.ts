@@ -215,6 +215,10 @@ export class QueueManager extends EventEmitter {
       return;
     }
 
+    if (this.activeJobIds.size >= this.maxConcurrentDownloads) {
+      return;
+    }
+
     this.activeJobIds.add(job.id);
     job.status = 'downloading';
     job.updatedAt = new Date().toISOString();
@@ -487,6 +491,11 @@ export class QueueManager extends EventEmitter {
     const job = this.jobs.get(jobId);
     if (!job) return false;
 
+    // Guard: Only active downloading or pending jobs can be paused
+    if (job.status !== 'downloading' && job.status !== 'pending') {
+      return false;
+    }
+
     if (job.childJobIds && job.childJobIds.length > 0) {
       for (const childId of job.childJobIds) {
         await this.pauseJob(childId);
@@ -519,6 +528,11 @@ export class QueueManager extends EventEmitter {
   public async resumeJob(jobId: string): Promise<boolean> {
     const job = this.jobs.get(jobId);
     if (!job) return false;
+
+    // Guard: Only paused jobs can be resumed
+    if (job.status !== 'paused') {
+      return false;
+    }
 
     if (job.childJobIds && job.childJobIds.length > 0) {
       for (const childId of job.childJobIds) {
@@ -596,6 +610,11 @@ export class QueueManager extends EventEmitter {
     const job = this.jobs.get(jobId);
     if (!job) return false;
 
+    // Guard: If already completed or cancelled, cancel is a safe no-op
+    if (job.status === 'completed' || job.status === 'cancelled') {
+      return true;
+    }
+
     if (job.childJobIds && job.childJobIds.length > 0) {
       for (const childId of job.childJobIds) {
         await this.cancelJob(childId);
@@ -632,6 +651,11 @@ export class QueueManager extends EventEmitter {
   public async retryJob(jobId: string): Promise<boolean> {
     const job = this.jobs.get(jobId);
     if (!job) return false;
+
+    // Guard: Only failed or cancelled jobs can be retried
+    if (job.status !== 'failed' && job.status !== 'cancelled') {
+      return false;
+    }
 
     // Partial Retry for parent container jobs:
     // Only retry children that failed or were cancelled; do NOT re-download completed children!
@@ -787,7 +811,9 @@ export class QueueManager extends EventEmitter {
 
   private handleWorkerProgress(payload: DownloadProgressEventPayload): void {
     const job = this.jobs.get(payload.jobId);
-    if (!job) return;
+    if (!job || job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') {
+      return;
+    }
 
     job.progress = payload.progress;
     job.downloadedBytes = payload.downloadedBytes;
@@ -873,7 +899,7 @@ export class QueueManager extends EventEmitter {
 
   private handleWorkerCompleted(payload: DownloadCompletedEventPayload): void {
     const job = this.jobs.get(payload.jobId);
-    if (!job) return;
+    if (!job || job.status === 'cancelled' || job.status === 'failed') return;
 
     if (payload.totalBytes > 0) {
       job.downloadedBytes = payload.totalBytes;
@@ -936,7 +962,7 @@ export class QueueManager extends EventEmitter {
 
   private handleWorkerPostprocessProgress(payload: PostProcessProgressEventPayload): void {
     const job = this.jobs.get(payload.jobId);
-    if (!job) return;
+    if (!job || job.status === 'cancelled' || job.status === 'completed' || job.status === 'failed') return;
 
     job.processingProgress = payload.progress;
     job.processingStage = payload.stage;
@@ -955,7 +981,7 @@ export class QueueManager extends EventEmitter {
 
   private handleWorkerPostprocessCompleted(payload: PostProcessCompletedEventPayload): void {
     const job = this.jobs.get(payload.jobId);
-    if (!job) return;
+    if (!job || job.status === 'cancelled') return;
 
     job.status = 'completed';
     job.progress = 100;
@@ -984,7 +1010,7 @@ export class QueueManager extends EventEmitter {
 
   private handleWorkerPostprocessFailed(payload: PostProcessFailedEventPayload): void {
     const job = this.jobs.get(payload.jobId);
-    if (!job) return;
+    if (!job || job.status === 'cancelled' || job.status === 'completed') return;
 
     job.status = 'failed';
     job.speedBytesPerSec = 0;
@@ -1010,7 +1036,7 @@ export class QueueManager extends EventEmitter {
 
   private handleWorkerFailed(payload: DownloadFailedEventPayload): void {
     const job = this.jobs.get(payload.jobId);
-    if (!job) return;
+    if (!job || job.status === 'cancelled' || job.status === 'completed') return;
 
     job.status = 'failed';
     job.speedBytesPerSec = 0;
@@ -1036,7 +1062,7 @@ export class QueueManager extends EventEmitter {
 
   private handleWorkerCancelled(payload: DownloadCancelledEventPayload): void {
     const job = this.jobs.get(payload.jobId);
-    if (!job) return;
+    if (!job || job.status === 'cancelled' || job.status === 'completed') return;
 
     job.status = 'cancelled';
     job.speedBytesPerSec = 0;

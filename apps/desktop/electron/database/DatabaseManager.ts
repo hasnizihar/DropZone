@@ -17,6 +17,7 @@ export class DatabaseManager {
   private inMemoryOnly = false;
   private saveTimeout: NodeJS.Timeout | null = null;
   private isSaving = false;
+  private hasPendingSave = false;
   private isShuttingDown = false;
 
   constructor(options?: DatabaseManagerOptions) {
@@ -183,7 +184,12 @@ export class DatabaseManager {
   }
 
   public saveImmediately(): void {
-    if (this.inMemoryOnly || !this.dbPath || !this.db || this.isSaving) {
+    if (this.inMemoryOnly || !this.dbPath || !this.db) {
+      return;
+    }
+
+    if (this.isSaving) {
+      this.hasPendingSave = true;
       return;
     }
 
@@ -193,16 +199,27 @@ export class DatabaseManager {
     }
 
     this.isSaving = true;
+    const tmpPath = `${this.dbPath}.tmp`;
     try {
       const data = this.db.export();
       const buffer = Buffer.from(data);
-      const tmpPath = `${this.dbPath}.tmp`;
       fs.writeFileSync(tmpPath, buffer);
       fs.renameSync(tmpPath, this.dbPath);
     } catch (err) {
       console.error('[DatabaseManager] Failed to persist database to disk:', err);
+      if (fs.existsSync(tmpPath)) {
+        try {
+          fs.unlinkSync(tmpPath);
+        } catch {
+          // ignore unlink error
+        }
+      }
     } finally {
       this.isSaving = false;
+      if (this.hasPendingSave && !this.isShuttingDown) {
+        this.hasPendingSave = false;
+        this.saveImmediately();
+      }
     }
   }
 
@@ -237,3 +254,4 @@ export class DatabaseManager {
     }
   }
 }
+

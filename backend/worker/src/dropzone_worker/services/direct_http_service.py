@@ -146,7 +146,7 @@ class DirectHttpService:
             last_response = resp
             break
 
-        if not last_response:
+        if last_response is None:
             raise WorkerProtocolError(
                 ProtocolErrorCode.NETWORK_ERROR,
                 f"Failed to inspect URL '{url}': No response obtained."
@@ -157,10 +157,26 @@ class DirectHttpService:
         last_response.close()
 
         if status_code >= 400:
-            raise WorkerProtocolError(
-                ProtocolErrorCode.NETWORK_ERROR,
-                f"HTTP {status_code} error from server at '{current_url}'."
-            )
+            if status_code == 429:
+                raise WorkerProtocolError(
+                    ProtocolErrorCode.RATE_LIMITED,
+                    f"Rate limited by server (HTTP 429) at '{current_url}'."
+                )
+            elif status_code in (401, 403):
+                raise WorkerProtocolError(
+                    ProtocolErrorCode.AUTH_REQUIRED,
+                    f"Access forbidden or authentication required (HTTP {status_code}) at '{current_url}'."
+                )
+            elif status_code in (500, 502, 503, 504):
+                raise WorkerProtocolError(
+                    ProtocolErrorCode.NETWORK_ERROR,
+                    f"Remote server error (HTTP {status_code}) at '{current_url}'."
+                )
+            else:
+                raise WorkerProtocolError(
+                    ProtocolErrorCode.DOWNLOAD_FAILED,
+                    f"HTTP {status_code} error from server at '{current_url}'."
+                )
 
         # Parse Content-Type and MIME
         content_type_raw = headers.get("Content-Type", "application/octet-stream")
