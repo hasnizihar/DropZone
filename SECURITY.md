@@ -56,3 +56,12 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - Output files are written to isolated temporary files (`.tmp.ext`) and verified using FFprobe before atomic commitment (`os.replace`).
    - On error or user cancellation, temporary output files are cleaned up immediately, while valid source downloads are retained without loss.
    - FFmpeg process cancellation utilizes tree termination (`psutil`), preventing orphaned or runaway background encoding processes on Windows.
+
+9. **SQLite Storage & Data Safety (Milestone 8)**
+   - Renderer processes have no direct database access; all database queries and transactions are mediated exclusively by Electron Main through typed IPC channels.
+   - SQL injection is eliminated by strictly utilizing parameterized queries (`?` bindings) and prepared statements across all read and write queries; untrusted user inputs are never interpolated into SQL strings.
+   - Foreign key constraints are actively enforced (`PRAGMA foreign_keys = ON;`), maintaining referential integrity across parent-child container relationships and preventing orphaned records.
+   - Application settings and job models are validated with Zod schemas before being persisted to or returned from SQLite; malformed or outdated records fall back to safe defaults.
+   - Physical file deletion is strictly segregated from database record removal: deleting a history record leaves the downloaded file intact on disk. Physical file deletion requires explicit user confirmation and validates paths to ensure only targeted download files are unlinked.
+   - Sensitive credentials, passwords, and authorization tokens are strictly forbidden from being stored in the SQLite database.
+   - Database files are stored exclusively in the application's isolated `userData` directory, preventing source repository pollution or unauthorized file placement.

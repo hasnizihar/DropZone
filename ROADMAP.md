@@ -12,7 +12,7 @@
 - [x] Image & Gallery Extraction (Milestone 5)
 - [x] Batch & Playlist Processing (Milestone 6)
 - [x] FFmpeg Stream Merging & Audio Conversion (Milestone 7)
-- [ ] Settings Persistence & History Management (Milestone 8)
+- [x] Settings Persistence & History Management (Milestone 8)
 - [ ] End-to-End Testing & Crash Recovery Hardening (Milestone 9)
 - [ ] Windows NSIS Installer & Portable Executable (Milestone 10)
 

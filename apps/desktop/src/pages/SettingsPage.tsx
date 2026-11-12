@@ -21,6 +21,7 @@ export const SettingsPage: React.FC = () => {
   const workerStatus = useAppStore((state) => state.workerStatus);
   const ffmpegInfo = useAppStore((state) => state.ffmpegInfo);
   const restartWorker = useAppStore((state) => state.restartWorker);
+  const resetSettings = useAppStore((state) => state.resetSettings);
 
   const engines = systemInfo?.engines;
   const workerState = workerStatus?.state || (workerStatus?.isAlive ? 'healthy' : 'stopped');
@@ -28,11 +29,25 @@ export const SettingsPage: React.FC = () => {
 
   return (
     <div className="p-8 space-y-8 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-brand-white">Application Settings</h1>
-        <p className="text-xs text-brand-grey">
-          Configure directories, download concurrency limits, and backend engines.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-brand-white">Application Settings</h1>
+          <p className="text-xs text-brand-grey">
+            Configure directories, download concurrency limits, and backend engines.
+          </p>
+        </div>
+
+        <button
+          onClick={() => {
+            if (window.confirm('Reset all application preferences to factory defaults?')) {
+              resetSettings();
+            }
+          }}
+          className="px-3.5 py-1.5 bg-brand-surface border border-brand-border hover:border-amber-500/50 hover:bg-amber-500/10 text-xs text-brand-grey hover:text-amber-400 rounded-lg flex items-center space-x-1.5 transition-colors self-start sm:self-auto"
+        >
+          <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+          <span>Reset to Defaults</span>
+        </button>
       </div>
 
       {/* Storage & Directories */}
@@ -58,6 +73,16 @@ export const SettingsPage: React.FC = () => {
               Change Folder
             </button>
           </div>
+        </div>
+
+        <div className="pt-3 border-t border-brand-border/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs font-mono">
+          <span className="text-brand-grey flex items-center space-x-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-brand-lime" />
+            <span>SQLite Database: <strong className="text-brand-white">dropzone.db</strong> (Active)</span>
+          </span>
+          <span className="text-brand-lime font-bold text-[11px]">
+            SCHEMA v1 (Versioned Migrations Enabled)
+          </span>
         </div>
       </div>
 

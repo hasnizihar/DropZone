@@ -16,6 +16,7 @@ import type {
   PostProcessFailedEventPayload,
 } from '@dropzone/shared';
 import { WorkerManager } from '../worker/WorkerManager';
+import { JobRepository } from '../database/JobRepository';
 
 export const CONTAINER_ENGINES = new Set<DownloadEngineType>(['image-gallery', 'playlist', 'batch']);
 
@@ -62,6 +63,7 @@ export interface QueueManagerConfig {
   maxConcurrentDownloads?: number;
   autoStartDownloads?: boolean;
   defaultDownloadDir: string;
+  jobRepository?: JobRepository;
 }
 
 export class QueueManager extends EventEmitter {
@@ -71,6 +73,7 @@ export class QueueManager extends EventEmitter {
   private autoStartDownloads: boolean;
   private defaultDownloadDir: string;
   private workerManager: WorkerManager;
+  private jobRepository?: JobRepository;
 
   constructor(workerManager: WorkerManager, config: QueueManagerConfig) {
     super();
@@ -78,8 +81,58 @@ export class QueueManager extends EventEmitter {
     this.maxConcurrentDownloads = config.maxConcurrentDownloads ?? 3;
     this.autoStartDownloads = config.autoStartDownloads ?? true;
     this.defaultDownloadDir = config.defaultDownloadDir;
+    this.jobRepository = config.jobRepository;
 
     this.bindWorkerEvents();
+  }
+
+  public setJobRepository(jobRepository: JobRepository): void {
+    this.jobRepository = jobRepository;
+  }
+
+  public hydrateFromDatabase(): void {
+    if (!this.jobRepository) return;
+
+    const persistedJobs = this.jobRepository.getAllJobs();
+    if (!persistedJobs || persistedJobs.length === 0) return;
+
+    for (const job of persistedJobs) {
+      // Reconcile interrupted active states
+      if (job.status === 'downloading') {
+        job.status = 'failed';
+        job.error = {
+          code: 'DOWNLOAD_INTERRUPTED',
+          message: 'Download was interrupted when the application was closed.',
+        };
+        job.speedBytesPerSec = 0;
+        job.etaSeconds = null;
+        job.updatedAt = new Date().toISOString();
+      } else if (job.status === 'processing') {
+        job.status = 'failed';
+        job.error = {
+          code: 'POSTPROCESS_INTERRUPTED',
+          message: 'Post-processing was interrupted when the application was closed; can be retried directly.',
+        };
+        job.speedBytesPerSec = 0;
+        job.etaSeconds = null;
+        job.updatedAt = new Date().toISOString();
+      }
+
+      this.jobs.set(job.id, job);
+    }
+
+    // Reconcile parent aggregate states
+    for (const job of persistedJobs) {
+      if (job.parentJobId) {
+        this.updateParentTerminalState(job.parentJobId);
+      }
+    }
+
+    // Persist reconciled jobs
+    this.jobRepository.saveJobs(Array.from(this.jobs.values()));
+
+    // Schedule any pending jobs if autoStartDownloads is enabled
+    this.processQueue();
   }
 
   private bindWorkerEvents(): void {
@@ -166,6 +219,7 @@ export class QueueManager extends EventEmitter {
     job.status = 'downloading';
     job.updatedAt = new Date().toISOString();
     this.emit('job-updated', job);
+    this.jobRepository?.saveJob(job);
 
     const targetDirectory = job.targetDirectory || this.defaultDownloadDir;
     const isAudioExtraction = job.category === 'file' && (job.selectedFormatId === 'audio_only' || job.title.endsWith('.mp3'));
@@ -250,6 +304,8 @@ export class QueueManager extends EventEmitter {
         this.jobs.set(childId, childJob);
         this.emit('job-added', childJob);
       }
+      const allCreated = [parentJob, ...parentJob.childJobIds!.map((id) => this.jobs.get(id)!).filter(Boolean)];
+      this.jobRepository?.saveJobs(allCreated);
       this.processQueue();
       return parentJob;
     }
@@ -315,6 +371,8 @@ export class QueueManager extends EventEmitter {
         this.jobs.set(childId, childJob);
         this.emit('job-added', childJob);
       }
+      const allCreated = [parentJob, ...parentJob.childJobIds!.map((id) => this.jobs.get(id)!).filter(Boolean)];
+      this.jobRepository?.saveJobs(allCreated);
       this.processQueue();
       return parentJob;
     }
@@ -384,6 +442,8 @@ export class QueueManager extends EventEmitter {
         this.jobs.set(childId, childJob);
         this.emit('job-added', childJob);
       }
+      const allCreated = [parentJob, ...parentJob.childJobIds!.map((id) => this.jobs.get(id)!).filter(Boolean)];
+      this.jobRepository?.saveJobs(allCreated);
       this.processQueue();
       return parentJob;
     }
@@ -418,6 +478,7 @@ export class QueueManager extends EventEmitter {
 
     this.jobs.set(id, newJob);
     this.emit('job-added', newJob);
+    this.jobRepository?.saveJob(newJob);
     this.processQueue();
     return newJob;
   }
@@ -449,6 +510,7 @@ export class QueueManager extends EventEmitter {
     job.speedBytesPerSec = 0;
     job.etaSeconds = null;
     job.updatedAt = new Date().toISOString();
+    this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
     this.processQueue();
     return true;
@@ -474,6 +536,7 @@ export class QueueManager extends EventEmitter {
     job.status = 'pending';
     job.error = undefined;
     job.updatedAt = new Date().toISOString();
+    this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
     this.processQueue();
     return true;
@@ -501,6 +564,7 @@ export class QueueManager extends EventEmitter {
     job.processingStage = 'processing';
     job.updatedAt = new Date().toISOString();
     this.activeJobIds.add(job.id);
+    this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
 
     try {
@@ -559,6 +623,7 @@ export class QueueManager extends EventEmitter {
     job.speedBytesPerSec = 0;
     job.etaSeconds = null;
     job.updatedAt = new Date().toISOString();
+    this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
     this.processQueue();
     return true;
@@ -592,6 +657,8 @@ export class QueueManager extends EventEmitter {
         job.error = undefined;
         job.isPartialFailure = false;
         job.updatedAt = new Date().toISOString();
+        const retriedChildren = job.childJobIds.map((id) => this.jobs.get(id)!).filter(Boolean);
+        this.jobRepository?.saveJobs([job, ...retriedChildren]);
         this.emit('job-updated', job);
         this.processQueue();
         return true;
@@ -611,6 +678,7 @@ export class QueueManager extends EventEmitter {
       job.etaSeconds = null;
       job.updatedAt = new Date().toISOString();
       this.activeJobIds.add(job.id);
+      this.jobRepository?.saveJob(job);
       this.emit('job-updated', job);
 
       this.workerManager.postprocessMedia({
@@ -642,6 +710,7 @@ export class QueueManager extends EventEmitter {
     job.speedBytesPerSec = 0;
     job.etaSeconds = null;
     job.updatedAt = new Date().toISOString();
+    this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
     this.processQueue();
     return true;
@@ -671,6 +740,7 @@ export class QueueManager extends EventEmitter {
     }
 
     this.jobs.delete(jobId);
+    this.jobRepository?.removeJob(jobId, false);
     this.emit('job-removed', jobId);
     this.processQueue();
     return true;
@@ -679,11 +749,12 @@ export class QueueManager extends EventEmitter {
   public clearCompleted(): number {
     let count = 0;
     for (const [id, job] of this.jobs.entries()) {
-      if (job.status === 'completed' || job.status === 'cancelled') {
+      if (job.status === 'completed' || job.status === 'cancelled' || job.status === 'failed') {
         this.jobs.delete(id);
         count++;
       }
     }
+    this.jobRepository?.clearHistory();
     return count;
   }
 
@@ -796,6 +867,7 @@ export class QueueManager extends EventEmitter {
     }
 
     parent.updatedAt = new Date().toISOString();
+    this.jobRepository?.saveJob(parent);
     this.emit('job-updated', parent);
   }
 
@@ -818,6 +890,7 @@ export class QueueManager extends EventEmitter {
       job.speedBytesPerSec = 0;
       job.etaSeconds = null;
       job.updatedAt = new Date().toISOString();
+      this.jobRepository?.saveJob(job);
       this.emit('job-updated', job);
 
       this.workerManager.postprocessMedia({
@@ -850,6 +923,7 @@ export class QueueManager extends EventEmitter {
     job.updatedAt = new Date().toISOString();
 
     this.activeJobIds.delete(job.id);
+    this.jobRepository?.saveJob(job);
     this.emit('job-completed', job);
     this.emit('job-updated', job);
 
@@ -897,6 +971,7 @@ export class QueueManager extends EventEmitter {
     job.updatedAt = new Date().toISOString();
 
     this.activeJobIds.delete(job.id);
+    this.jobRepository?.saveJob(job);
     this.emit('job-completed', job);
     this.emit('job-updated', job);
 
@@ -922,6 +997,7 @@ export class QueueManager extends EventEmitter {
     job.updatedAt = new Date().toISOString();
 
     this.activeJobIds.delete(job.id);
+    this.jobRepository?.saveJob(job);
     this.emit('job-failed', job);
     this.emit('job-updated', job);
 
@@ -947,6 +1023,7 @@ export class QueueManager extends EventEmitter {
     job.updatedAt = new Date().toISOString();
 
     this.activeJobIds.delete(job.id);
+    this.jobRepository?.saveJob(job);
     this.emit('job-failed', job);
     this.emit('job-updated', job);
 
@@ -967,6 +1044,7 @@ export class QueueManager extends EventEmitter {
     job.updatedAt = new Date().toISOString();
 
     this.activeJobIds.delete(job.id);
+    this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
 
     if (job.parentJobId) {
@@ -986,6 +1064,7 @@ export class QueueManager extends EventEmitter {
     job.updatedAt = new Date().toISOString();
 
     this.activeJobIds.delete(job.id);
+    this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
     this.processQueue();
   }

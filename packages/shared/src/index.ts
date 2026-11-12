@@ -318,7 +318,28 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 // ==========================================
-// 7. IPC CONTRACT SPECIFICATION
+// 7. DOWNLOAD HISTORY QUERY MODEL
+// ==========================================
+export interface HistoryQueryOptions {
+  searchTerm?: string;
+  category?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+  sortBy?: 'created_at' | 'title' | 'size';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface HistoryListResult {
+  items: DownloadJob[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+// ==========================================
+// 8. IPC CONTRACT SPECIFICATION
 // ==========================================
 export interface IpcRendererToMainApi {
   // Analyzer (Milestone 3 & 5 unified media, direct file, and gallery analysis)
@@ -385,6 +406,14 @@ export interface IpcRendererToMainApi {
   // Settings
   getSettings(): Promise<AppSettings>;
   updateSettings(settings: Partial<AppSettings>): Promise<AppSettings>;
+  resetSettings(): Promise<AppSettings>;
+
+  // History (Milestone 8 SQLite)
+  listHistory(query?: HistoryQueryOptions): Promise<HistoryListResult>;
+  getHistoryItem(jobId: string): Promise<DownloadJob | null>;
+  removeHistoryItem(jobId: string): Promise<{ success: boolean; error?: string }>;
+  clearHistory(): Promise<{ success: boolean; count: number }>;
+  deleteDownloadedFile(jobId: string): Promise<{ success: boolean; error?: string }>;
 
   // Worker Subprocess (Milestone 2)
   startWorker(): Promise<{ success: boolean; error?: string }>;

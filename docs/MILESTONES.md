@@ -125,13 +125,28 @@ This document tracks progress through the 10 core milestones defined in the DROP
 
 ---
 
-## Milestone 8: Settings & Polish
-- **Status:** Pending
+## Milestone 8: Settings Persistence & Download History (SQLite)
+- **Status:** Complete (Commit `[M8 Commit]`)
 - **Scope:**
-  - Persistent application settings (storage directory, speed limits, network timeouts).
-  - History view with search, filter, direct file reveal, re-download.
-  - Keyboard shortcuts and accessibility.
-  - Toast notifications and system notifications.
+  - Dedicated persistence layer in Electron Main utilizing WebAssembly-powered SQLite (`sql.js`).
+  - Stored under Electron `app.getPath('userData')/dropzone.db` with safe directory creation and atomic disk commit (`.tmp` -> `fs.renameSync`).
+  - Automated versioned schema migrations (`schema_migrations`) applying initial schema v1 transactionally.
+  - Foreign key enforcement (`PRAGMA foreign_keys = ON;`) and prepared statement parameterized query safety.
+  - Automatic corruption recovery: detects file corruption, creates timestamped backup (`dropzone.db.corrupted.<timestamp>`), and initializes clean database.
+  - `SettingsRepository`: durable storage for user preferences (concurrency, directories, audio formats, bitrates, containers, retention) with Zod validation and safe default fallback.
+  - "Reset to Defaults" functionality restoring initial state across database and live application.
+  - `JobRepository`: durable download history preserving parent-child hierarchies (batch, playlists, image galleries) and post-processing metadata.
+  - History query API supporting keyword search, category filtering, status filtering, sorting, and pagination.
+  - Authoritative `QueueManager` startup hydration & recovery policy:
+    - Reconciles interrupted live downloads (`downloading` -> `failed` with code `DOWNLOAD_INTERRUPTED`).
+    - Reconciles interrupted post-processing (`processing` -> `failed` with code `POSTPROCESS_INTERRUPTED`).
+    - Enables instant direct retry for interrupted post-processing jobs without re-downloading source files.
+    - Recalculates aggregate status and progress for parent containers.
+  - Safe file operations: distinguished database record removal from physical file deletion, with safe path checks.
+  - UI integration:
+    - `HistoryPage`: fully functional table with search, category & status dropdowns, pagination, clear history modal, open file/folder buttons, retry button, record deletion, and physical file deletion.
+    - `SettingsPage`: reset to factory defaults button and SQLite persistence telemetry status card.
+  - Verified acceptance: 70/70 Vitest tests passing across 12 test suites, 52/52 Pytest tests passing, 0 TypeScript errors on shared & desktop, and clean production build.
 
 ---
 

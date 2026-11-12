@@ -37,6 +37,14 @@ export const IPC_CHANNELS = {
   // Settings
   SETTINGS_GET: 'settings:get',
   SETTINGS_UPDATE: 'settings:update',
+  SETTINGS_RESET: 'settings:reset',
+
+  // History (Milestone 8 SQLite)
+  HISTORY_LIST: 'history:list',
+  HISTORY_GET: 'history:get',
+  HISTORY_REMOVE: 'history:remove',
+  HISTORY_CLEAR: 'history:clear',
+  HISTORY_DELETE_FILE: 'history:delete-file',
 
   // Main -> Renderer Events
   EVENT_DOWNLOAD_PROGRESS: 'event:download-progress',

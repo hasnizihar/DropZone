@@ -236,3 +236,40 @@ Direct file downloads stream network bytes directly to disk in bounded 64 KB chu
 - **Processing Stage**: `QueueManager` manages the `processing` status between download completion and final success. Concurrency slots are released only when post-processing finishes.
 - **Cached Source Retention**: If post-processing fails, `sourcePath` is retained on disk. Calling `retryJob` skips redownloading entirely and re-executes post-processing directly from the local file.
 - **Process Cancellation**: Terminating or cancelling a processing job kills the underlying FFmpeg process tree cleanly via `psutil`, preventing zombie processes on Windows.
+
+---
+
+## 9. SQLite Persistence & Download History Architecture (Milestone 8)
+
+### 9.1 Database Ownership & WebAssembly Architecture
+- **Single Authoritative Owner**: Electron Main is the sole owner and reader/writer of the SQLite database. UI renderers interact exclusively through typed, schema-validated IPC invocations.
+- **Engine Selection (`sql.js` WebAssembly)**:
+  - Uses official SQLite 3 compiled to WebAssembly via `sql.js` (`sql-wasm-inline.js`).
+  - Completely avoids Windows native module (`.node`) compilation and code integrity / Windows Defender Application Control (WDAC) blocks (`ERR_DLOPEN_FAILED`) that affect native C++ drivers like `better-sqlite3`.
+  - Operates at in-memory speeds with debounced and transaction-triggered atomic disk commits (`fs.writeFileSync(tmp) -> fs.renameSync(db)`).
+- **Database Location**:
+  - Located securely at `path.join(app.getPath('userData'), 'dropzone.db')`.
+  - Never stored in the source repository or hardcoded user paths.
+  - Automatically creates parent directories safely.
+
+### 9.2 Versioned Schema & Migration Framework
+- **Migration Tracking**: Managed through `schema_migrations` (`version`, `name`, `applied_at`).
+- **Sequential Execution**: Migrations execute sequentially inside atomic transactions.
+- **Schema v1 Tables**:
+  - `settings`: Key-value configuration store for application preferences.
+  - `download_jobs`: Complete record of all active and historic jobs, preserving parent-child relationships (`FOREIGN KEY (parent_job_id) REFERENCES download_jobs(id) ON DELETE CASCADE`), post-processing parameters, error details, and byte counts.
+  - Performance indexes: Indexing on `status`, `category`, `created_at`, and `parent_job_id`.
+- **Integrity Probing & Corruption Recovery**: Automatically runs `PRAGMA integrity_check;`. If file corruption is detected, creates a timestamped backup (`dropzone.db.corrupted.<timestamp>`) and initializes a clean schema without crashing.
+
+### 9.3 Startup Hydration & Interrupted Job Recovery Policy
+- **Authoritative Scheduler Preservation**: `QueueManager` remains the live execution authority and in-memory scheduler. SQLite acts as the durable log, recording state changes without holding open locks during downloads.
+- **State Recovery Rules on Startup**:
+  - `completed` → Restored as `completed`.
+  - `failed` → Restored as `failed`.
+  - `cancelled` → Restored as `cancelled`.
+  - `pending` → Restored as `pending` (scheduled FIFO if `autoStartDownloads` is enabled).
+  - `downloading` → Reconciled to `failed` with error code `DOWNLOAD_INTERRUPTED` ("Download was interrupted when the application was closed").
+  - `processing` → Reconciled to `failed` with error code `POSTPROCESS_INTERRUPTED` ("Post-processing was interrupted when the application was closed; can be retried directly").
+  - Parent container jobs aggregate restored child states and recompute completed counts and progress.
+- **Direct Retry**: Retrying an interrupted processing job reuses the local `sourcePath` directly without re-downloading.
+

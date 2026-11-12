@@ -6,6 +6,7 @@ import type {
   DownloadJob,
   SystemEnginesReport,
   PostProcessOptions,
+  HistoryQueryOptions,
 } from '@dropzone/shared';
 
 const dropzoneApi = {
@@ -41,6 +42,14 @@ const dropzoneApi = {
   // Settings
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
   updateSettings: (settings: Partial<AppSettings>) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE, settings),
+  resetSettings: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_RESET),
+
+  // History (Milestone 8 SQLite)
+  listHistory: (query?: HistoryQueryOptions) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_LIST, query),
+  getHistoryItem: (jobId: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_GET, jobId),
+  removeHistoryItem: (jobId: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_REMOVE, jobId),
+  clearHistory: () => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_CLEAR),
+  deleteDownloadedFile: (jobId: string) => ipcRenderer.invoke(IPC_CHANNELS.HISTORY_DELETE_FILE, jobId),
 
   // Worker Subprocess (Milestone 2)
   startWorker: () => ipcRenderer.invoke(IPC_CHANNELS.WORKER_START),

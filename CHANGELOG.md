@@ -2,7 +2,26 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
-## [1.0.0-alpha.7] - 2026-11-12
+## [1.0.0-alpha.8] - 2026-11-13
+
+### Added
+- **Local-First SQLite Persistence Engine**: Implemented `DatabaseManager` in Electron Main utilizing WebAssembly-powered SQLite (`sql.js`), eliminating native C++ `.node` compilation and Windows Application Control / WDAC DLL execution blocks.
+- **Isolated User Storage Location**: Database securely placed at `app.getPath('userData')/dropzone.db` with safe directory initialization, debounced flushing, and atomic disk commits (`.tmp` -> `fs.renameSync`).
+- **Versioned Schema & Migrations**: Automated versioned migration framework (`schema_migrations`) creating `settings` and `download_jobs` tables with performance indexes and foreign key enforcement (`PRAGMA foreign_keys = ON;`).
+- **Database Corruption Auto-Recovery**: Integrated startup integrity probing (`PRAGMA integrity_check;`) that safely backs up corrupted files (`dropzone.db.corrupted.<timestamp>`) and initializes clean storage without crashing.
+- **Persistent Application Settings**: Implemented `SettingsRepository` persisting user preferences (concurrency, directories, audio formats, bitrates, containers, retention) across application restarts with Zod validation.
+- **Reset to Factory Defaults**: Added `settings:reset` IPC operation and UI button to reset preferences to verified defaults.
+- **Durable Download History**: Implemented `JobRepository` with pagination, keyword search, category filtering, and status filtering preserving parent-child container hierarchies and post-processing metadata.
+- **Authoritative Startup Hydration & Recovery Policy**:
+  - `QueueManager` restores completed, failed, and cancelled jobs in durable state.
+  - In-flight downloads are marked failed with `DOWNLOAD_INTERRUPTED` on startup.
+  - In-flight post-processing is marked failed with `POSTPROCESS_INTERRUPTED` on startup, allowing direct retry from cached source.
+  - Parent container jobs recalculate aggregate progress and counts from restored child states.
+- **Safe Physical File Operations**: Strictly segregated database record removal from physical file deletion, requiring explicit user confirmation before unlinking files.
+- **UI Enhancements**:
+  - `HistoryPage`: Upgraded with search input, category filter dropdown, status filter dropdown, pagination controls, clear history modal, open file/folder buttons, retry action, and file deletion modal.
+  - `SettingsPage`: Added "Reset to Defaults" button and SQLite database status card.
+- **Comprehensive Test Suites**: Added 11 database tests (`sqliteDatabase.test.ts`) and 4 queue hydration tests (`queueHydration.test.ts`), bringing Vitest tests to 70 across 12 test files (plus 52 Pytest tests passing).
 
 ### Added
 - **Dedicated FFmpeg Post-Processing Service**: Implemented `FFmpegService` in Python worker providing non-blocking post-processing via subprocess worker threads without saturating stdout protocol JSONL messages.

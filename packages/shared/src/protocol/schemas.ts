@@ -254,6 +254,42 @@ export const GetFfmpegInfoResponsePayloadSchema = z.object({
   supportedContainers: z.array(z.string()),
 });
 
+export const AppSettingsSchema = z.object({
+  defaultDownloadDir: z.string(),
+  maxConcurrentDownloads: z.number().int().min(1).max(20),
+  autoStartDownloads: z.boolean(),
+  theme: z.enum(['dark', 'light', 'system']),
+  retryCount: z.number().int().min(0).max(10),
+  defaultVideoQuality: z.enum(['best', '1080p', '720p', '480p']),
+  defaultAudioFormat: z.enum(['mp3', 'm4a', 'wav', 'flac', 'opus']),
+  defaultAudioBitrate: z.enum(['128k', '192k', '256k', '320k']),
+  defaultRemuxContainer: z.enum(['mp4', 'mkv', 'webm']),
+  preserveDownloadedSource: z.boolean(),
+  speedLimitKbs: z.number().int().min(0),
+  networkTimeoutSeconds: z.number().int().min(5).max(300),
+  proxyUrl: z.string().optional(),
+  loggingLevel: z.enum(['debug', 'info', 'warn', 'error']),
+});
+
+export const HistoryQueryOptionsSchema = z.object({
+  searchTerm: z.string().optional(),
+  category: z.string().optional(),
+  status: z.string().optional(),
+  limit: z.number().int().min(1).max(200).default(50),
+  offset: z.number().int().min(0).default(0),
+  sortBy: z.enum(['created_at', 'title', 'size']).default('created_at'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+});
+
+export const HistoryListResultSchema = z.object({
+  items: z.array(z.any()),
+  totalCount: z.number(),
+  page: z.number(),
+  pageSize: z.number(),
+  totalPages: z.number(),
+});
+
+
 
 
 

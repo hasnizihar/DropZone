@@ -11,6 +11,7 @@ import type {
   CreateDownloadOptions,
   PostProcessOptions,
   AnalysisStatus,
+  HistoryQueryOptions,
 } from '@dropzone/shared';
 import { DEFAULT_SETTINGS } from '@dropzone/shared';
 
@@ -100,6 +101,27 @@ interface AppState {
   // Post-Processing Actions (Milestone 7)
   fetchFfmpegInfo: () => Promise<void>;
   postprocessJob: (jobId: string, options: PostProcessOptions) => Promise<boolean>;
+
+  // History State & Actions (Milestone 8 SQLite)
+  historyItems: DownloadJob[];
+  historyTotalCount: number;
+  historyPage: number;
+  historyPageSize: number;
+  historyTotalPages: number;
+  historySearchTerm: string;
+  historyCategoryFilter: string;
+  historyStatusFilter: string;
+  isHistoryLoading: boolean;
+
+  fetchHistory: (query?: Partial<HistoryQueryOptions>) => Promise<void>;
+  setHistoryPage: (page: number) => Promise<void>;
+  setHistorySearchTerm: (term: string) => Promise<void>;
+  setHistoryCategoryFilter: (category: string) => Promise<void>;
+  setHistoryStatusFilter: (status: string) => Promise<void>;
+  removeHistoryItem: (jobId: string) => Promise<void>;
+  clearHistory: () => Promise<void>;
+  deleteDownloadedFile: (jobId: string) => Promise<void>;
+  resetSettings: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -121,6 +143,17 @@ export const useAppStore = create<AppState>((set, get) => ({
   toast: null,
   workerStatus: null,
   ffmpegInfo: null,
+
+  // History State
+  historyItems: [],
+  historyTotalCount: 0,
+  historyPage: 1,
+  historyPageSize: 50,
+  historyTotalPages: 1,
+  historySearchTerm: '',
+  historyCategoryFilter: 'all',
+  historyStatusFilter: 'all',
+  isHistoryLoading: false,
 
   setActiveTab: (activeTab) => set({ activeTab }),
 
@@ -265,6 +298,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         ffmpegInfo: ffmpegInfo || null,
       });
 
+      // Initial history fetch from SQLite (Milestone 8)
+      get().fetchHistory().catch(console.error);
+
       // Register live listeners
       window.dropzone.onDownloadProgress((updatedJob) => {
         set((state) => {
@@ -285,6 +321,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           jobs: state.jobs.map((j) => (j.id === completedJob.id ? completedJob : j)),
         }));
         get().showToast(`Finished download: ${completedJob.title}`, 'success');
+        get().fetchHistory().catch(console.error);
       });
 
       window.dropzone.onDownloadFailed((failedJob) => {
@@ -292,6 +329,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           jobs: state.jobs.map((j) => (j.id === failedJob.id ? failedJob : j)),
         }));
         get().showToast(`Download failed: ${failedJob.title}`, 'error');
+        get().fetchHistory().catch(console.error);
       });
 
       window.dropzone.onEngineStatusChanged((report) => {
@@ -665,6 +703,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         const res = await window.dropzone.postprocessJob(jobId, options);
         if (res.success) {
           get().showToast('Post-processing completed successfully', 'success');
+          get().fetchHistory().catch(console.error);
           return true;
         } else {
           get().showToast(res.error || 'Post-processing failed', 'error');
@@ -676,6 +715,116 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
     return false;
+  },
+
+  // History Actions (Milestone 8 SQLite)
+  fetchHistory: async (queryOverride?: Partial<HistoryQueryOptions>) => {
+    if (typeof window === 'undefined' || !window.dropzone || !window.dropzone.listHistory) return;
+    set({ isHistoryLoading: true });
+    try {
+      const state = get();
+      const limit = queryOverride?.limit ?? state.historyPageSize;
+      const offset = queryOverride?.offset ?? (state.historyPage - 1) * limit;
+      const searchTerm = queryOverride?.searchTerm !== undefined ? queryOverride.searchTerm : state.historySearchTerm;
+      const category = queryOverride?.category !== undefined ? queryOverride.category : state.historyCategoryFilter;
+      const status = queryOverride?.status !== undefined ? queryOverride.status : state.historyStatusFilter;
+
+      const res = await window.dropzone.listHistory({
+        limit,
+        offset,
+        searchTerm,
+        category,
+        status,
+        sortBy: queryOverride?.sortBy ?? 'created_at',
+        sortOrder: queryOverride?.sortOrder ?? 'desc',
+      });
+
+      set({
+        historyItems: res.items,
+        historyTotalCount: res.totalCount,
+        historyPage: res.page,
+        historyPageSize: res.pageSize,
+        historyTotalPages: res.totalPages,
+        isHistoryLoading: false,
+      });
+    } catch (err) {
+      console.error('Failed to list history:', err);
+      set({ isHistoryLoading: false });
+    }
+  },
+
+  setHistoryPage: async (page: number) => {
+    const limit = get().historyPageSize;
+    const offset = Math.max(0, (page - 1) * limit);
+    set({ historyPage: page });
+    await get().fetchHistory({ offset });
+  },
+
+  setHistorySearchTerm: async (term: string) => {
+    set({ historySearchTerm: term, historyPage: 1 });
+    await get().fetchHistory({ searchTerm: term, offset: 0 });
+  },
+
+  setHistoryCategoryFilter: async (category: string) => {
+    set({ historyCategoryFilter: category, historyPage: 1 });
+    await get().fetchHistory({ category, offset: 0 });
+  },
+
+  setHistoryStatusFilter: async (status: string) => {
+    set({ historyStatusFilter: status, historyPage: 1 });
+    await get().fetchHistory({ status, offset: 0 });
+  },
+
+  removeHistoryItem: async (jobId: string) => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.removeHistoryItem) {
+      const res = await window.dropzone.removeHistoryItem(jobId);
+      if (res.success) {
+        set((state) => ({
+          historyItems: state.historyItems.filter((item) => item.id !== jobId && item.parentJobId !== jobId),
+          historyTotalCount: Math.max(0, state.historyTotalCount - 1),
+          jobs: state.jobs.filter((j) => j.id !== jobId && j.parentJobId !== jobId),
+        }));
+        get().showToast('History record removed', 'info');
+      }
+    }
+  },
+
+  clearHistory: async () => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.clearHistory) {
+      const res = await window.dropzone.clearHistory();
+      if (res.success) {
+        set((state) => ({
+          historyItems: state.historyItems.filter((i) => i.status !== 'completed' && i.status !== 'cancelled' && i.status !== 'failed'),
+          historyTotalCount: 0,
+          jobs: state.jobs.filter((j) => j.status !== 'completed' && j.status !== 'cancelled' && j.status !== 'failed'),
+        }));
+        get().showToast(`Cleared ${res.count} history records`, 'info');
+        await get().fetchHistory({ offset: 0 });
+      }
+    }
+  },
+
+  deleteDownloadedFile: async (jobId: string) => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.deleteDownloadedFile) {
+      const res = await window.dropzone.deleteDownloadedFile(jobId);
+      if (res.success) {
+        set((state) => ({
+          historyItems: state.historyItems.filter((item) => item.id !== jobId && item.parentJobId !== jobId),
+          jobs: state.jobs.filter((j) => j.id !== jobId && j.parentJobId !== jobId),
+        }));
+        get().showToast('File and record deleted', 'success');
+      } else {
+        get().showToast(res.error || 'Failed to delete file', 'error');
+      }
+    }
+  },
+
+  resetSettings: async () => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.resetSettings) {
+      const defaults = await window.dropzone.resetSettings();
+      set({ settings: defaults });
+      get().showToast('Settings reset to defaults', 'info');
+    }
   },
 }));
 

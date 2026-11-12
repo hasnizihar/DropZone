@@ -5,17 +5,23 @@ import { IPC_CHANNELS } from '../ipc/channels';
 import { getSystemEnginesReport } from './engines';
 import { WorkerManager } from '../worker/WorkerManager';
 import { QueueManager } from '../queue/QueueManager';
+import { DatabaseManager, SettingsRepository, JobRepository } from '../database';
 import {
   AppSettings,
+  DEFAULT_SETTINGS,
   DownloadJob,
   CreateDownloadOptions,
   PostProcessOptions,
   MediaInfo,
+  HistoryQueryOptions,
   parseBatchUrls,
 } from '@dropzone/shared';
 
 let mainWindow: BrowserWindow | null = null;
 const workerManager = new WorkerManager();
+let databaseManager: DatabaseManager;
+let settingsRepository: SettingsRepository;
+let jobRepository: JobRepository;
 
 // Initial application settings
 const defaultDownloadDir = path.join(app.getPath('downloads'), 'DropZone');
@@ -178,19 +184,65 @@ function setupIpcHandlers() {
     }
   });
 
-  // Settings
+  // Settings (Milestone 8 SQLite)
   ipcMain.handle(IPC_CHANNELS.SETTINGS_GET, () => {
-    return appSettings;
+    return settingsRepository ? settingsRepository.getSettings() : appSettings;
   });
 
   ipcMain.handle(IPC_CHANNELS.SETTINGS_UPDATE, (_event, partialSettings: Partial<AppSettings>) => {
-    appSettings = { ...appSettings, ...partialSettings };
+    if (settingsRepository) {
+      appSettings = settingsRepository.updateSettings(partialSettings);
+    } else {
+      appSettings = { ...appSettings, ...partialSettings };
+    }
     queueManager.updateSettings(
       appSettings.maxConcurrentDownloads,
       appSettings.autoStartDownloads,
       appSettings.defaultDownloadDir
     );
     return appSettings;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SETTINGS_RESET, () => {
+    if (settingsRepository) {
+      appSettings = settingsRepository.resetSettings();
+    } else {
+      appSettings = { ...DEFAULT_SETTINGS, defaultDownloadDir: appSettings.defaultDownloadDir };
+    }
+    queueManager.updateSettings(
+      appSettings.maxConcurrentDownloads,
+      appSettings.autoStartDownloads,
+      appSettings.defaultDownloadDir
+    );
+    return appSettings;
+  });
+
+  // History (Milestone 8 SQLite)
+  ipcMain.handle(IPC_CHANNELS.HISTORY_LIST, (_event, query?: HistoryQueryOptions) => {
+    if (!jobRepository) {
+      return { items: [], totalCount: 0, page: 1, pageSize: 50, totalPages: 1 };
+    }
+    return jobRepository.listHistory(query);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.HISTORY_GET, (_event, jobId: string) => {
+    if (!jobRepository) return null;
+    return jobRepository.getJob(jobId);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.HISTORY_REMOVE, async (_event, jobId: string) => {
+    const success = await queueManager.removeJob(jobId, false);
+    return { success };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.HISTORY_CLEAR, () => {
+    const count = queueManager.clearCompleted();
+    return { success: true, count };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.HISTORY_DELETE_FILE, async (_event, jobId: string) => {
+    const success = await queueManager.removeJob(jobId, true);
+    return { success };
   });
 
   // Media Analyzer (Milestone 3 with real Python yt-dlp worker backend)
@@ -532,6 +584,43 @@ function setupIpcHandlers() {
 
 // App lifecycle
 app.whenReady().then(async () => {
+  // Initialize SQLite database under electron userData directory (Milestone 8)
+  try {
+    const dbPath = path.join(app.getPath('userData'), 'dropzone.db');
+    databaseManager = new DatabaseManager({ dbPath });
+    await databaseManager.initialize();
+
+    settingsRepository = new SettingsRepository(databaseManager);
+    jobRepository = new JobRepository(databaseManager);
+
+    // Hydrate settings
+    const loadedSettings = settingsRepository.getSettings();
+    if (!loadedSettings.defaultDownloadDir) {
+      const defaultDir = path.join(app.getPath('downloads'), 'DropZone');
+      if (!fs.existsSync(defaultDir)) {
+        try {
+          fs.mkdirSync(defaultDir, { recursive: true });
+        } catch (err) {
+          console.error('Failed to create default download directory:', err);
+        }
+      }
+      loadedSettings.defaultDownloadDir = defaultDir;
+      settingsRepository.updateSettings({ defaultDownloadDir: defaultDir });
+    }
+    appSettings = loadedSettings;
+
+    // Hydrate QueueManager with durable storage & reconcile interrupted downloads
+    queueManager.updateSettings(
+      appSettings.maxConcurrentDownloads,
+      appSettings.autoStartDownloads,
+      appSettings.defaultDownloadDir
+    );
+    queueManager.setJobRepository(jobRepository);
+    queueManager.hydrateFromDatabase();
+  } catch (dbErr) {
+    console.error('[Database Init Error] Failed to initialize SQLite database:', dbErr);
+  }
+
   setupIpcHandlers();
   mainWindow = createWindow();
 
@@ -607,6 +696,13 @@ app.on('before-quit', async () => {
     await workerManager.stop();
   } catch (err) {
     console.error('Error stopping worker during quit:', err);
+  }
+  try {
+    if (databaseManager) {
+      databaseManager.close();
+    }
+  } catch (err) {
+    console.error('Error closing database during quit:', err);
   }
 });
 
