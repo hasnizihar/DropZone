@@ -14,6 +14,7 @@ import {
   Image as ImageIcon,
   FileText,
   Video,
+  Sparkles,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -39,7 +40,7 @@ export const DownloadsPage: React.FC = () => {
 
   const filteredJobs = jobs.filter((job) => {
     if (activeFilter === 'all') return true;
-    if (activeFilter === 'active') return job.status === 'downloading';
+    if (activeFilter === 'active') return job.status === 'downloading' || job.status === 'processing';
     if (activeFilter === 'queued') return job.status === 'pending';
     if (activeFilter === 'completed') return job.status === 'completed';
     if (activeFilter === 'failed') return job.status === 'failed' || job.status === 'cancelled';
@@ -89,7 +90,7 @@ export const DownloadsPage: React.FC = () => {
       <div className="flex border-b border-brand-border space-x-2">
         {[
           { id: 'all', label: 'All Jobs', count: jobs.length },
-          { id: 'active', label: 'Active', count: jobs.filter((j) => j.status === 'downloading').length },
+          { id: 'active', label: 'Active', count: jobs.filter((j) => j.status === 'downloading' || j.status === 'processing').length },
           { id: 'queued', label: 'Queued', count: jobs.filter((j) => j.status === 'pending').length },
           { id: 'completed', label: 'Completed', count: jobs.filter((j) => j.status === 'completed').length },
           { id: 'failed', label: 'Failed', count: jobs.filter((j) => j.status === 'failed' || j.status === 'cancelled').length },
@@ -151,6 +152,17 @@ export const DownloadsPage: React.FC = () => {
                         {job.source}
                       </span>
 
+                      {job.postProcess && (
+                        <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold flex items-center space-x-1">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span>
+                            {job.postProcess.action === 'extract_audio'
+                              ? `AUDIO (${job.postProcess.audioFormat?.toUpperCase() || 'MP3'})`
+                              : `REMUX (${job.postProcess.remuxContainer?.toUpperCase() || 'MP4'})`}
+                          </span>
+                        </span>
+                      )}
+
                       {job.assetCount !== undefined && job.assetCount > 0 && (
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-lime/10 text-brand-lime border border-brand-lime/20 font-bold">
                           {job.completedAssetsCount || 0} / {job.assetCount} assets
@@ -171,6 +183,8 @@ export const DownloadsPage: React.FC = () => {
                     className={`text-[11px] font-mono px-2.5 py-0.5 rounded-full border ${
                       job.status === 'completed'
                         ? 'bg-brand-lime/10 text-brand-lime border-brand-lime/30'
+                        : job.status === 'processing'
+                        ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30 animate-pulse'
                         : job.status === 'downloading'
                         ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
                         : job.status === 'paused'
@@ -182,27 +196,52 @@ export const DownloadsPage: React.FC = () => {
                   </span>
                 </div>
 
-                {/* Progress Bar (Acid Lime) */}
-                <div className="space-y-1">
-                  <div className="w-full bg-brand-black h-2 rounded-full overflow-hidden border border-brand-border">
-                    <div
-                      className="h-full bg-brand-lime transition-all duration-300 rounded-full"
-                      style={{ width: `${Math.min(100, Math.max(0, job.progress))}%` }}
-                    />
-                  </div>
+                {/* Progress Bar */}
+                {job.status === 'processing' ? (
+                  <div className="space-y-1">
+                    <div className="w-full bg-brand-black h-2 rounded-full overflow-hidden border border-brand-border">
+                      <div
+                        className="h-full bg-cyan-400 transition-all duration-300 rounded-full"
+                        style={{ width: `${Math.min(100, Math.max(0, job.processingProgress ?? 0))}%` }}
+                      />
+                    </div>
 
-                  <div className="flex justify-between items-center text-xs text-brand-grey font-mono">
-                    <span>{job.progress.toFixed(1)}%</span>
-                    <div className="flex space-x-3">
-                      {job.speedBytesPerSec > 0 && (
-                        <span>{formatBytes(job.speedBytesPerSec)}/s</span>
-                      )}
-                      <span>
-                        {formatBytes(job.downloadedBytes)} / {job.totalBytes ? formatBytes(job.totalBytes) : 'Unknown'}
+                    <div className="flex justify-between items-center text-xs text-brand-grey font-mono">
+                      <span className="text-cyan-400 font-semibold flex items-center space-x-1.5">
+                        <Sparkles className="w-3 h-3 text-cyan-400 animate-spin" />
+                        <span>
+                          {job.processingStage === 'verifying'
+                            ? 'Verifying Output with FFprobe...'
+                            : job.postProcess?.action === 'extract_audio'
+                            ? `Extracting Audio (${job.postProcess.audioFormat?.toUpperCase() || 'MP3'})...`
+                            : `Remuxing Video Container (${job.postProcess?.remuxContainer?.toUpperCase() || 'MP4'})...`}
+                        </span>
                       </span>
+                      <span className="text-cyan-400 font-bold">{(job.processingProgress ?? 0).toFixed(1)}%</span>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-1">
+                    <div className="w-full bg-brand-black h-2 rounded-full overflow-hidden border border-brand-border">
+                      <div
+                        className="h-full bg-brand-lime transition-all duration-300 rounded-full"
+                        style={{ width: `${Math.min(100, Math.max(0, job.progress))}%` }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs text-brand-grey font-mono">
+                      <span>{job.progress.toFixed(1)}%</span>
+                      <div className="flex space-x-3">
+                        {job.speedBytesPerSec > 0 && (
+                          <span>{formatBytes(job.speedBytesPerSec)}/s</span>
+                        )}
+                        <span>
+                          {formatBytes(job.downloadedBytes)} / {job.totalBytes ? formatBytes(job.totalBytes) : 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Controls */}
                 <div className="flex items-center justify-between pt-1 border-t border-brand-border/60">
@@ -235,10 +274,19 @@ export const DownloadsPage: React.FC = () => {
                     {(job.status === 'failed' || job.status === 'cancelled') && (
                       <button
                         onClick={() => retryJob(job.id)}
-                        className="p-1.5 rounded bg-brand-black border border-brand-border text-brand-grey hover:text-brand-white transition-colors"
-                        title="Retry"
+                        className={`p-1.5 rounded bg-brand-black border border-brand-border text-brand-grey hover:text-brand-white transition-colors flex items-center space-x-1 ${
+                          job.postProcess && job.sourcePath ? 'text-cyan-400 border-cyan-500/40 hover:text-cyan-300' : ''
+                        }`}
+                        title={job.postProcess && job.sourcePath ? 'Retry Processing (Using cached source file)' : 'Retry'}
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
+                        {job.postProcess && job.sourcePath ? (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-mono font-bold pr-1">Retry FX</span>
+                          </>
+                        ) : (
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        )}
                       </button>
                     )}
 

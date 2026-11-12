@@ -96,12 +96,32 @@ This document tracks progress through the 10 core milestones defined in the DROP
 ---
 
 ## Milestone 7: FFmpeg & Audio Post-Processing
-- **Status:** Pending
+- **Status:** Complete
 - **Scope:**
-  - FFmpeg integration for post-processing.
-  - Audio extraction to MP3, M4A, WAV, FLAC.
-  - Video stream and audio stream merging.
-  - Codec validation and clean error handling.
+  - Dedicated `FFmpegService` in Python worker managing post-processing subprocesses without blocking the JSON Lines protocol.
+  - Executable discovery for FFmpeg and FFprobe across system `PATH`, environment variables (`DROPZONE_FFMPEG_PATH`), and Windows package locations.
+  - Audio extraction with codec allowlists:
+    - MP3 (`libmp3lame`, 128k–320k)
+    - M4A (`aac`, 128k–256k)
+    - WAV (`pcm_s16le`)
+    - FLAC (`flac`)
+    - OPUS (`libopus`, 96k–192k)
+  - Video container remuxing with stream copying (`-c copy`) for MP4, MKV, WebM, and MOV to prevent unnecessary transcoding quality loss.
+  - Audio and video stream merging (`-map 0:v:0 -map 1:a:0 -c copy`).
+  - Metadata embedding (`title`, `artist`, `album`, `date`) and ID3v2 cover art attachment.
+  - Safe output pipeline: `Input -> Temporary Output (.tmp.ext) -> FFprobe Verification -> Atomic Rename -> Final Output`.
+  - Structured progress tracking parsing `-progress pipe:1` with throttled event dispatch (max 4 events/sec).
+  - Cooperative cancellation with Windows process tree termination via `psutil`.
+  - QueueManager lifecycle integration:
+    - Dedicated `processing` status between download and completion.
+    - Preserves source file on disk during processing failure.
+    - Direct post-processing retry re-using downloaded source file without redownloading.
+    - Cascading cancellation propagating to active FFmpeg subprocesses.
+  - UI enhancements:
+    - `AnalyzerPage`: Conversion mode tabs (`Original Stream`, `Extract Audio`, `Remux Container`), codec pills, bitrate selectors, metadata/thumbnail embedding checkboxes.
+    - `DownloadsPage`: Distinct `PROCESSING` badge, secondary stage progress bar, and dedicated "Retry FX" button.
+    - `SettingsPage`: Default audio format, default bitrate, default remux container, source file retention toggle, and FFprobe probe telemetry.
+  - Verified acceptance: 52/52 Pytest tests passing, 55/55 Vitest tests passing across 10 test suites, zero TypeScript errors (`tsc --noEmit`), and clean production build.
 
 ---
 

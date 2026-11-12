@@ -185,5 +185,75 @@ export const BatchItemAnalysisResultSchema = z.object({
   customFilename: z.string().optional(),
 });
 
+export const PostProcessOptionsSchema = z.object({
+  action: z.enum(['extract_audio', 'remux', 'merge']),
+  audioFormat: z.enum(['mp3', 'm4a', 'wav', 'flac', 'opus']).optional(),
+  audioBitrate: z.enum(['96k', '128k', '160k', '192k', '256k', '320k', 'best']).optional(),
+  remuxContainer: z.enum(['mp4', 'mkv', 'webm', 'mov']).optional(),
+  embedMetadata: z.boolean().optional(),
+  embedThumbnail: z.boolean().optional(),
+  thumbnailPath: z.string().optional(),
+  preserveSource: z.boolean().optional(),
+});
+
+export const PostProcessRequestPayloadSchema = z.object({
+  jobId: z.string().min(1),
+  inputPath: z.string().min(1),
+  action: z.enum(['extract_audio', 'remux', 'merge']),
+  targetDirectory: z.string().min(1),
+  audioFormat: z.enum(['mp3', 'm4a', 'wav', 'flac', 'opus']).optional(),
+  audioBitrate: z.string().optional(),
+  remuxContainer: z.enum(['mp4', 'mkv', 'webm', 'mov']).optional(),
+  secondaryInputPath: z.string().optional(),
+  customFilename: z.string().optional(),
+  embedMetadata: z.boolean().optional(),
+  metadata: z.record(z.any()).optional(),
+  thumbnailPath: z.string().optional(),
+  preserveSource: z.boolean().optional(),
+});
+
+export const PostProcessResponsePayloadSchema = z.object({
+  success: z.boolean(),
+  jobId: z.string(),
+  outputPath: z.string(),
+  totalBytes: z.number(),
+  duration: z.number().optional(),
+  action: z.string(),
+});
+
+export const PostProcessProgressEventPayloadSchema = z.object({
+  jobId: z.string(),
+  progress: z.number().min(0).max(100),
+  stage: z.enum(['processing', 'verifying']),
+  outTimeSeconds: z.number().optional(),
+  totalDuration: z.number().optional(),
+});
+
+export const PostProcessCompletedEventPayloadSchema = z.object({
+  jobId: z.string(),
+  outputPath: z.string(),
+  totalBytes: z.number(),
+  duration: z.number().optional(),
+  action: z.string(),
+});
+
+export const PostProcessFailedEventPayloadSchema = z.object({
+  jobId: z.string(),
+  code: z.string(),
+  message: z.string(),
+  details: z.record(z.any()).optional(),
+});
+
+export const GetFfmpegInfoResponsePayloadSchema = z.object({
+  available: z.boolean(),
+  version: z.string().nullable(),
+  ffmpegPath: z.string().nullable(),
+  ffprobePath: z.string().nullable(),
+  probeAvailable: z.boolean(),
+  supportedAudioFormats: z.array(z.string()),
+  supportedContainers: z.array(z.string()),
+});
+
+
 
 

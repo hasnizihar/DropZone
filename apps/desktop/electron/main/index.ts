@@ -9,6 +9,7 @@ import {
   AppSettings,
   DownloadJob,
   CreateDownloadOptions,
+  PostProcessOptions,
   MediaInfo,
   parseBatchUrls,
 } from '@dropzone/shared';
@@ -34,6 +35,9 @@ let appSettings: AppSettings = {
   retryCount: 3,
   defaultVideoQuality: 'best',
   defaultAudioFormat: 'mp3',
+  defaultAudioBitrate: '192k',
+  defaultRemuxContainer: 'mp4',
+  preserveDownloadedSource: false,
   speedLimitKbs: 0,
   networkTimeoutSeconds: 30,
   loggingLevel: 'info',
@@ -118,6 +122,26 @@ function setupIpcHandlers() {
     const engines = await getSystemEnginesReport();
     engines.workerRunning = workerManager.getStatusInfo().isAlive;
     return engines;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SYSTEM_GET_FFMPEG_INFO, async () => {
+    try {
+      if (!workerManager.getStatusInfo().isAlive) {
+        await workerManager.start();
+      }
+      return await workerManager.getFfmpegInfo();
+    } catch (err: any) {
+      return {
+        available: false,
+        version: null,
+        ffmpegPath: null,
+        ffprobePath: null,
+        probeAvailable: false,
+        supportedAudioFormats: [],
+        supportedContainers: [],
+        error: err?.message,
+      };
+    }
   });
 
   ipcMain.handle(IPC_CHANNELS.SYSTEM_SELECT_DIRECTORY, async () => {
@@ -394,6 +418,10 @@ function setupIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.DOWNLOADS_CLEAR_COMPLETED, () => {
     const count = queueManager.clearCompleted();
     return { success: true, count };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.DOWNLOADS_POSTPROCESS, async (_event, jobId: string, options: PostProcessOptions) => {
+    return await queueManager.postprocessJob(jobId, options);
   });
 
   // Playlist Inspector

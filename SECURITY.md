@@ -48,3 +48,11 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - Playlist inspection is bounded (default max 200 items, `playlistend`) in flat non-downloading mode, preventing memory exhaustion and infinite-stream denial of service.
    - Private and restricted content is detected and marked unavailable without attempting authentication bypass or access control defeats.
    - Filename collision handling enforces deterministic unique names (`resolveUniqueFilename`), guaranteeing that multiple URLs in the same directory never overwrite completed files without explicit authorization.
+
+8. **FFmpeg Subprocess Execution & Process Safety (Milestone 7)**
+   - FFmpeg and FFprobe are executed strictly via Python's `subprocess.Popen` / `subprocess.run` with list-based arguments; `shell=True` is forbidden across the entire codebase to eliminate shell injection vulnerabilities.
+   - User-supplied filenames are sanitized (`sanitize_filename`), stripping directory separators, control characters, and Windows reserved names.
+   - Codecs, container formats, and audio bitrates are validated against strict allowlists (`AUDIO_FORMAT_SPECS`, `CONTAINER_SPECS`); arbitrary command options or custom filtergraphs are rejected.
+   - Output files are written to isolated temporary files (`.tmp.ext`) and verified using FFprobe before atomic commitment (`os.replace`).
+   - On error or user cancellation, temporary output files are cleaned up immediately, while valid source downloads are retained without loss.
+   - FFmpeg process cancellation utilizes tree termination (`psutil`), preventing orphaned or runaway background encoding processes on Windows.

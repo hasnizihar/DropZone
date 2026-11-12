@@ -31,6 +31,7 @@ export type JobStatus =
   | 'analyzing'
   | 'ready'
   | 'downloading'
+  | 'processing'
   | 'paused'
   | 'completed'
   | 'failed'
@@ -41,6 +42,7 @@ export const JOB_STATUS_LIST: JobStatus[] = [
   'analyzing',
   'ready',
   'downloading',
+  'processing',
   'paused',
   'completed',
   'failed',
@@ -188,6 +190,17 @@ export interface UnifiedAnalysisResult {
   assets?: GalleryAsset[];
 }
 
+export interface PostProcessOptions {
+  action: 'extract_audio' | 'remux' | 'merge';
+  audioFormat?: 'mp3' | 'm4a' | 'wav' | 'flac' | 'opus';
+  audioBitrate?: '96k' | '128k' | '160k' | '192k' | '256k' | '320k' | 'best';
+  remuxContainer?: 'mp4' | 'mkv' | 'webm' | 'mov';
+  embedMetadata?: boolean;
+  embedThumbnail?: boolean;
+  thumbnailPath?: string;
+  preserveSource?: boolean;
+}
+
 // ==========================================
 // 4. DOWNLOAD JOB MODEL
 // ==========================================
@@ -201,6 +214,10 @@ export interface DownloadJob {
   status: JobStatus;
   selectedFormatId?: string;
   outputPath?: string;
+  sourcePath?: string;
+  postProcess?: PostProcessOptions;
+  processingProgress?: number;
+  processingStage?: 'processing' | 'verifying';
   targetDirectory: string;
   customFilename?: string;
   thumbnail?: string;
@@ -236,7 +253,9 @@ export interface CreateDownloadOptions {
   category?: ContentCategory;
   engine?: DownloadEngineType;
   extractAudio?: boolean;
-  audioFormat?: 'mp3' | 'm4a' | 'wav' | 'flac';
+  audioFormat?: 'mp3' | 'm4a' | 'wav' | 'flac' | 'opus';
+  audioBitrate?: '96k' | '128k' | '160k' | '192k' | '256k' | '320k' | 'best';
+  postProcess?: PostProcessOptions;
   parentJobId?: string;
   assets?: GalleryAsset[];
   playlistItems?: PlaylistItem[];
@@ -272,7 +291,10 @@ export interface AppSettings {
   theme: 'dark' | 'light' | 'system';
   retryCount: number;
   defaultVideoQuality: 'best' | '1080p' | '720p' | '480p';
-  defaultAudioFormat: 'mp3' | 'm4a' | 'wav' | 'flac';
+  defaultAudioFormat: 'mp3' | 'm4a' | 'wav' | 'flac' | 'opus';
+  defaultAudioBitrate: '128k' | '192k' | '256k' | '320k';
+  defaultRemuxContainer: 'mp4' | 'mkv' | 'webm';
+  preserveDownloadedSource: boolean;
   speedLimitKbs: number; // 0 = unlimited
   networkTimeoutSeconds: number;
   proxyUrl?: string;
@@ -287,6 +309,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   retryCount: 3,
   defaultVideoQuality: 'best',
   defaultAudioFormat: 'mp3',
+  defaultAudioBitrate: '192k',
+  defaultRemuxContainer: 'mp4',
+  preserveDownloadedSource: false,
   speedLimitKbs: 0,
   networkTimeoutSeconds: 30,
   loggingLevel: 'info',
@@ -322,6 +347,17 @@ export interface IpcRendererToMainApi {
   removeJob(jobId: string, deleteFile?: boolean): Promise<{ success: boolean; error?: string }>;
   clearCompletedJobs(): Promise<{ success: boolean; count: number }>;
   getAllJobs(): Promise<DownloadJob[]>;
+  postprocessJob(jobId: string, options: PostProcessOptions): Promise<{ success: boolean; outputPath?: string; error?: string }>;
+  getFfmpegInfo(): Promise<{
+    available: boolean;
+    version: string | null;
+    ffmpegPath: string | null;
+    ffprobePath: string | null;
+    probeAvailable: boolean;
+    supportedAudioFormats: string[];
+    supportedContainers: string[];
+    error?: string;
+  }>;
   
   // Batch
   inspectBatch(urls: string[]): Promise<{

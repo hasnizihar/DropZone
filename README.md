@@ -13,7 +13,7 @@ DROPZONE is a high-performance, modular desktop application designed for downloa
 - **Direct & Gallery Extraction**: High-throughput direct HTTP/HTTPS streaming with pause/resume support, chunked transfers, and image gallery bulk extraction.
 - **Playlist & Batch Processing**: Bounded inspection of media playlists (up to 200 items) and multi-URL batch ingestion (up to 50 URLs via paste or text/csv upload) with independent parallel analysis, parent-child queue architecture, selective item downloading, and partial failure retry.
 - **Queue & Concurrency Management**: Authoritative job state machine (`pending`, `analyzing`, `ready`, `downloading`, `paused`, `completed`, `failed`, `cancelled`) with configurable concurrency (default: 3).
-- **FFmpeg Post-Processing**: Audio extraction (MP3, M4A, WAV, FLAC), video remuxing, and stream merging.
+- **FFmpeg Post-Processing & Audio Extraction**: Audio extraction (MP3, M4A, WAV, FLAC, OPUS) with selectable bitrates, video remuxing (MP4, MKV, WebM, MOV) with stream copying, audio/video stream merging, metadata tagging, and cover art embedding.
 - **Local-First & Secure**: Strict Electron sandboxing, context isolation, zero remote telemetry, local SQLite persistence, and path traversal protection.
 
 ---

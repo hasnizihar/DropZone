@@ -9,6 +9,7 @@ import {
   Zap,
   RotateCcw,
   Activity,
+  Sparkles,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -18,6 +19,7 @@ export const SettingsPage: React.FC = () => {
   const selectDownloadDirectory = useAppStore((state) => state.selectDownloadDirectory);
   const systemInfo = useAppStore((state) => state.systemInfo);
   const workerStatus = useAppStore((state) => state.workerStatus);
+  const ffmpegInfo = useAppStore((state) => state.ffmpegInfo);
   const restartWorker = useAppStore((state) => state.restartWorker);
 
   const engines = systemInfo?.engines;
@@ -111,6 +113,111 @@ export const SettingsPage: React.FC = () => {
             onChange={(e) => updateSettings({ autoStartDownloads: e.target.checked })}
             className="w-4 h-4 accent-brand-lime cursor-pointer"
           />
+        </div>
+      </div>
+
+      {/* FFmpeg Post-Processing Defaults (Milestone 7) */}
+      <div className="bg-brand-surface border border-brand-border rounded-xl p-6 space-y-5">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-brand-lime flex items-center space-x-2">
+          <Sparkles className="w-4 h-4" />
+          <span>FFmpeg Post-Processing & Conversion Defaults</span>
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Default Audio Format */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-brand-white">Default Audio Extraction Format</label>
+            <div className="flex flex-wrap gap-2">
+              {(['mp3', 'm4a', 'wav', 'flac', 'opus'] as const).map((fmt) => (
+                <button
+                  key={fmt}
+                  type="button"
+                  onClick={() => updateSettings({ defaultAudioFormat: fmt })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase border transition-all ${
+                    settings.defaultAudioFormat === fmt
+                      ? 'bg-brand-lime text-brand-black border-brand-lime'
+                      : 'bg-brand-black text-brand-grey border-brand-border hover:text-brand-white'
+                  }`}
+                >
+                  {fmt}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-brand-grey">Applied when extracting audio tracks from videos.</p>
+          </div>
+
+          {/* Default Audio Bitrate */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-brand-white">Default Audio Bitrate</label>
+            <div className="flex flex-wrap gap-2">
+              {(['320k', '256k', '192k', '128k'] as const).map((br) => (
+                <button
+                  key={br}
+                  type="button"
+                  onClick={() => updateSettings({ defaultAudioBitrate: br })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all ${
+                    settings.defaultAudioBitrate === br
+                      ? 'bg-brand-lime text-brand-black font-bold border-brand-lime'
+                      : 'bg-brand-black text-brand-grey border-brand-border hover:text-brand-white'
+                  }`}
+                >
+                  {br}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-brand-grey">Encoding quality for MP3, M4A, and OPUS outputs.</p>
+          </div>
+
+          {/* Default Remux Container */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-brand-white">Default Video Remux Container</label>
+            <div className="flex flex-wrap gap-2">
+              {(['mp4', 'mkv', 'webm'] as const).map((cnt) => (
+                <button
+                  key={cnt}
+                  type="button"
+                  onClick={() => updateSettings({ defaultRemuxContainer: cnt })}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase border transition-all ${
+                    settings.defaultRemuxContainer === cnt
+                      ? 'bg-brand-lime text-brand-black border-brand-lime'
+                      : 'bg-brand-black text-brand-grey border-brand-border hover:text-brand-white'
+                  }`}
+                >
+                  {cnt}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-brand-grey">Target container when remuxing stream formats.</p>
+          </div>
+
+          {/* Preserve Source Toggle */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-brand-white">Source File Retention</label>
+            <label className="flex items-center space-x-2.5 pt-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={settings.preserveDownloadedSource}
+                onChange={(e) => updateSettings({ preserveDownloadedSource: e.target.checked })}
+                className="w-4 h-4 accent-brand-lime cursor-pointer"
+              />
+              <span className="text-xs text-brand-grey">Retain downloaded source file after post-processing</span>
+            </label>
+            <p className="text-[11px] text-brand-grey">When disabled, intermediate files are cleaned to free disk space.</p>
+          </div>
+        </div>
+
+        {/* FFprobe Verification Telemetry */}
+        <div className="pt-3 border-t border-brand-border/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs font-mono">
+          <span className="text-brand-grey">
+            FFprobe Verification: {ffmpegInfo?.probeAvailable ? (
+              <span className="text-brand-lime font-bold">ACTIVE (Integrity Probing Enabled)</span>
+            ) : (
+              <span className="text-amber-400 font-bold">Standard Probing</span>
+            )}
+          </span>
+          <span className="text-brand-grey text-[11px]">
+            {ffmpegInfo?.ffmpegPath ? `Path: ${ffmpegInfo.ffmpegPath}` : 'Path: System PATH'}
+          </span>
         </div>
       </div>
 

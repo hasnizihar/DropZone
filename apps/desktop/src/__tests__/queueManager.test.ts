@@ -24,6 +24,18 @@ describe('QueueManager State Machine & Concurrency Scheduler', () => {
       paused: true,
       jobId: 'mock_job',
     });
+    vi.spyOn(mockWorkerManager, 'postprocessMedia').mockResolvedValue({
+      success: true,
+      jobId: 'mock_job',
+      outputPath: 'C:/Downloads/DropZone/audio.mp3',
+      totalBytes: 4500000,
+      action: 'extract_audio',
+    });
+    vi.spyOn(mockWorkerManager, 'cancelPostprocess').mockResolvedValue({
+      success: true,
+      cancelled: true,
+      jobId: 'mock_job',
+    });
 
     queueManager = new QueueManager(mockWorkerManager, {
       maxConcurrentDownloads: 2,
@@ -384,5 +396,79 @@ describe('QueueManager State Machine & Concurrency Scheduler', () => {
     expect(queueManager.getJob(parentJob.id)).toBeUndefined();
     expect(queueManager.getJob(c1Id)).toBeUndefined();
     expect(queueManager.getJob(c2Id)).toBeUndefined();
+  });
+
+  it('transitions download to processing stage when postProcess is requested', () => {
+    const job = queueManager.addJob({
+      url: 'https://example.com/source.mp4',
+      customFilename: 'source.mp4',
+      postProcess: {
+        action: 'extract_audio',
+        audioFormat: 'mp3',
+        audioBitrate: '320k',
+      },
+    });
+
+    expect(job.status).toBe('downloading');
+
+    // Emit download completed from worker
+    mockWorkerManager.emit('download-completed', {
+      jobId: job.id,
+      outputPath: 'C:/Downloads/DropZone/source.mp4',
+      totalBytes: 15000000,
+    });
+
+    // Should transition to processing, NOT completed!
+    expect(job.status).toBe('processing');
+    expect(job.sourcePath).toBe('C:/Downloads/DropZone/source.mp4');
+    expect(job.processingProgress).toBe(0);
+    expect(mockWorkerManager.postprocessMedia).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: job.id,
+        action: 'extract_audio',
+        audioFormat: 'mp3',
+        audioBitrate: '320k',
+      })
+    );
+
+    // Simulate postprocess progress event
+    mockWorkerManager.emit('postprocess-progress', {
+      jobId: job.id,
+      progress: 65.5,
+      stage: 'processing',
+    });
+    expect(job.processingProgress).toBe(65.5);
+
+    // Simulate postprocess completed event
+    mockWorkerManager.emit('postprocess-completed', {
+      jobId: job.id,
+      outputPath: 'C:/Downloads/DropZone/source.mp3',
+      totalBytes: 5200000,
+      action: 'extract_audio',
+    });
+
+    expect(job.status).toBe('completed');
+    expect(job.outputPath).toBe('C:/Downloads/DropZone/source.mp3');
+    expect(job.totalBytes).toBe(5200000);
+  });
+
+  it('cancels active postprocessing subprocess when cancelJob is invoked', async () => {
+    const job = queueManager.addJob({
+      url: 'https://example.com/source.mp4',
+      postProcess: { action: 'remux', remuxContainer: 'mkv' },
+    });
+
+    mockWorkerManager.emit('download-completed', {
+      jobId: job.id,
+      outputPath: 'C:/Downloads/DropZone/source.mp4',
+      totalBytes: 10000000,
+    });
+
+    expect(job.status).toBe('processing');
+
+    await queueManager.cancelJob(job.id);
+
+    expect(job.status).toBe('cancelled');
+    expect(mockWorkerManager.cancelPostprocess).toHaveBeenCalledWith(job.id);
   });
 });

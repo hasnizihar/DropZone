@@ -27,7 +27,7 @@ import {
   HelpCircle,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
-import type { MediaFormat } from '@dropzone/shared';
+import type { MediaFormat, PostProcessOptions } from '@dropzone/shared';
 
 function formatBytes(bytes?: number | null): string {
   if (!bytes || bytes <= 0) return 'Unknown size';
@@ -73,6 +73,20 @@ export const AnalyzerPage: React.FC = () => {
   const [formatFilter, setFormatFilter] = useState<FormatFilter>('all');
   const [customFilename, setCustomFilename] = useState(analyzedMedia?.title || '');
   const [targetDir, setTargetDir] = useState(settings.defaultDownloadDir);
+
+  // Post-processing options (Milestone 7)
+  const [postProcessMode, setPostProcessMode] = useState<'original' | 'audio' | 'remux'>('original');
+  const [selectedAudioFormat, setSelectedAudioFormat] = useState<'mp3' | 'm4a' | 'wav' | 'flac' | 'opus'>(
+    settings.defaultAudioFormat || 'mp3'
+  );
+  const [selectedAudioBitrate, setSelectedAudioBitrate] = useState<'128k' | '192k' | '256k' | '320k'>(
+    settings.defaultAudioBitrate || '192k'
+  );
+  const [selectedRemuxContainer, setSelectedRemuxContainer] = useState<'mp4' | 'mkv' | 'webm'>(
+    settings.defaultRemuxContainer || 'mp4'
+  );
+  const [embedMetadata, setEmbedMetadata] = useState<boolean>(true);
+  const [preserveSource, setPreserveSource] = useState<boolean>(settings.preserveDownloadedSource || false);
 
   // Sync state when new media is analyzed
   useEffect(() => {
@@ -166,13 +180,33 @@ export const AnalyzerPage: React.FC = () => {
 
     // Standard media download
     const isAudio = analyzedMedia.metadata?.mediaType === 'audio' || selectedFormat?.isAudio;
+    let postProcess: PostProcessOptions | undefined = undefined;
+
+    if (postProcessMode === 'audio') {
+      postProcess = {
+        action: 'extract_audio',
+        audioFormat: selectedAudioFormat,
+        audioBitrate: selectedAudioBitrate,
+        embedMetadata,
+        preserveSource,
+      };
+    } else if (postProcessMode === 'remux') {
+      postProcess = {
+        action: 'remux',
+        remuxContainer: selectedRemuxContainer,
+        embedMetadata,
+        preserveSource,
+      };
+    }
+
     const ok = await addJob({
       url: analyzedMedia.url,
       selectedFormatId: selectedFormatId || undefined,
       customFilename: customFilename.trim() || analyzedMedia.title,
       targetDirectory: targetDir || settings.defaultDownloadDir,
-      category: isAudio ? 'file' : analyzedMedia.category,
+      category: (isAudio || postProcessMode === 'audio') ? 'file' : analyzedMedia.category,
       engine: 'yt-dlp',
+      postProcess,
     });
     if (ok) {
       showToast(action === 'start' ? 'Download started!' : 'Added to download queue', 'success');
@@ -636,6 +670,156 @@ export const AnalyzerPage: React.FC = () => {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* POST-PROCESSING & CONVERSION PANEL (FFmpeg Milestone 7) */}
+          {!isGalleryType && !isDirectFileType && !isDirectImageType && (
+            <div className="border-t border-brand-border pt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-brand-white flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-brand-lime" />
+                    <span>Post-Processing & Conversion (FFmpeg)</span>
+                  </h4>
+                  <p className="text-xs text-brand-grey mt-0.5">
+                    Extract audio tracks, remux video containers, and embed metadata.
+                  </p>
+                </div>
+
+                {/* Conversion Mode Tabs */}
+                <div className="flex items-center bg-brand-black p-1 rounded-lg border border-brand-border self-start sm:self-auto">
+                  {(
+                    [
+                      { id: 'original', label: 'Original Stream' },
+                      { id: 'audio', label: 'Extract Audio' },
+                      { id: 'remux', label: 'Remux Container' },
+                    ] as const
+                  ).map((mode) => (
+                    <button
+                      key={mode.id}
+                      onClick={() => setPostProcessMode(mode.id)}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
+                        postProcessMode === mode.id
+                          ? 'bg-brand-surface text-brand-lime shadow-sm'
+                          : 'text-brand-grey hover:text-brand-white'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mode-specific configuration */}
+              {postProcessMode === 'audio' && (
+                <div className="p-4 bg-brand-black/60 border border-brand-border rounded-xl space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Audio Format Selector */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-brand-white">Target Audio Codec & Format</label>
+                      <div className="flex flex-wrap gap-2">
+                        {(['mp3', 'm4a', 'wav', 'flac', 'opus'] as const).map((fmt) => (
+                          <button
+                            key={fmt}
+                            type="button"
+                            onClick={() => setSelectedAudioFormat(fmt)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase border transition-all ${
+                              selectedAudioFormat === fmt
+                                ? 'bg-brand-lime text-brand-black border-brand-lime'
+                                : 'bg-brand-surface text-brand-grey border-brand-border hover:text-brand-white'
+                            }`}
+                          >
+                            {fmt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Audio Bitrate Selector */}
+                    {['mp3', 'm4a', 'opus'].includes(selectedAudioFormat) && (
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-brand-white">Audio Bitrate</label>
+                        <div className="flex flex-wrap gap-2">
+                          {(['320k', '256k', '192k', '128k'] as const).map((br) => (
+                            <button
+                              key={br}
+                              type="button"
+                              onClick={() => setSelectedAudioBitrate(br)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all ${
+                                selectedAudioBitrate === br
+                                  ? 'bg-brand-lime text-brand-black font-bold border-brand-lime'
+                                  : 'bg-brand-surface text-brand-grey border-brand-border hover:text-brand-white'
+                              }`}
+                            >
+                              {br}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Options Checkboxes */}
+                  <div className="flex flex-wrap items-center gap-6 pt-2 border-t border-brand-border/60 text-xs">
+                    <label className="flex items-center space-x-2 text-brand-white cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={embedMetadata}
+                        onChange={(e) => setEmbedMetadata(e.target.checked)}
+                        className="accent-brand-lime rounded cursor-pointer"
+                      />
+                      <span>Embed ID3 Metadata & Album Art</span>
+                    </label>
+
+                    <label className="flex items-center space-x-2 text-brand-grey cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={preserveSource}
+                        onChange={(e) => setPreserveSource(e.target.checked)}
+                        className="accent-brand-lime rounded cursor-pointer"
+                      />
+                      <span>Keep downloaded source file</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {postProcessMode === 'remux' && (
+                <div className="p-4 bg-brand-black/60 border border-brand-border rounded-xl space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-brand-white">Destination Video Container</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(['mp4', 'mkv', 'webm'] as const).map((cnt) => (
+                        <button
+                          key={cnt}
+                          type="button"
+                          onClick={() => setSelectedRemuxContainer(cnt)}
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase border transition-all ${
+                            selectedRemuxContainer === cnt
+                              ? 'bg-brand-lime text-brand-black border-brand-lime'
+                              : 'bg-brand-surface text-brand-grey border-brand-border hover:text-brand-white'
+                          }`}
+                        >
+                          {cnt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-4 pt-2 border-t border-brand-border/60 text-xs">
+                    <label className="flex items-center space-x-2 text-brand-grey cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={preserveSource}
+                        onChange={(e) => setPreserveSource(e.target.checked)}
+                        className="accent-brand-lime rounded cursor-pointer"
+                      />
+                      <span>Keep original source file</span>
+                    </label>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -64,3 +64,4 @@ describe('parseBatchUrls', () => {
     expect(res.warning).toContain('Batch limit reached: only the first 50 URLs will be processed. 15 excess URLs were omitted.');
   });
 });
+

@@ -2,6 +2,23 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.7] - 2026-11-12
+
+### Added
+- **Dedicated FFmpeg Post-Processing Service**: Implemented `FFmpegService` in Python worker providing non-blocking post-processing via subprocess worker threads without saturating stdout protocol JSONL messages.
+- **Audio Extraction with Codec Allowlists**: Support for extracting audio tracks to MP3 (`libmp3lame`, 128k–320k), M4A (`aac`, 128k–256k), WAV (`pcm_s16le`), FLAC (`flac`), and OPUS (`libopus`, 96k–192k) with selectable bitrates.
+- **Lossless Stream Remuxing & Merging**: Video remuxing for MP4, MKV, WebM, and MOV containers prioritizing stream copying (`-c copy`) to avoid transcoding quality loss; merging separate video and audio tracks into single synchronized containers.
+- **Metadata & Album Art Embedding**: Embedded audio tags (`title`, `artist`, `album`, `date`) and ID3v2/FLAC album art cover attachments.
+- **Safe Atomic Output Workflow**: Two-phase output writing to temporary files (`.tmp.ext`), followed by FFprobe stream verification, and atomic commit via `os.replace` preventing corrupted target files.
+- **Throttled Structured Progress**: Parsed FFmpeg `-progress pipe:1` reporting percentage, processing speed, out time, and active stage with 250ms throttling.
+- **Cooperative Cancellation & Tree Termination**: Process cancellation using `psutil` terminating child process trees cleanly on Windows to prevent orphaned encoding tasks.
+- **Authoritative Queue Integration & Direct Retry**: Seamless `processing` status managed in `QueueManager`; failed post-processing retains downloaded source on disk and allows immediate "Retry FX" without re-downloading.
+- **UI Enhancements**:
+  - `AnalyzerPage`: Added conversion tabs (`Original Stream`, `Extract Audio`, `Remux Container`), codec selector pills, bitrate options, and metadata embedding checkboxes.
+  - `DownloadsPage`: Added distinct `PROCESSING` status badge, secondary progress bar, and "Retry FX" button.
+  - `SettingsPage`: Post-processing defaults for audio format, bitrate, remux container, source retention toggle, and live FFprobe probe telemetry.
+- **Comprehensive Test Suite**: Added 7 new Python tests (52 total) and 6 new Vitest tests (55 total across 10 test files) validating executable discovery, codec allowlists, argument construction, atomic output commits, queue transitions, and direct retry.
+
 ## [1.0.0-alpha.6] - 2026-11-12
 
 ### Added

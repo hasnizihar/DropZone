@@ -12,6 +12,10 @@ export const WORKER_EVENTS = {
   DOWNLOAD_FAILED: 'download.failed',
   DOWNLOAD_CANCELLED: 'download.cancelled',
   DOWNLOAD_PAUSED: 'download.paused',
+  POSTPROCESS_STARTED: 'postprocess.started',
+  POSTPROCESS_PROGRESS: 'postprocess.progress',
+  POSTPROCESS_COMPLETED: 'postprocess.completed',
+  POSTPROCESS_FAILED: 'postprocess.failed',
 } as const;
 
 export type WorkerEventName = typeof WORKER_EVENTS[keyof typeof WORKER_EVENTS] | string;
@@ -67,6 +71,36 @@ export interface DownloadCancelledEventPayload {
 
 export interface DownloadPausedEventPayload {
   jobId: string;
+}
+
+export interface PostProcessStartedEventPayload {
+  jobId: string;
+  action: string;
+  inputPath: string;
+  targetPath: string;
+}
+
+export interface PostProcessProgressEventPayload {
+  jobId: string;
+  progress: number; // 0 - 100
+  stage: 'processing' | 'verifying';
+  outTimeSeconds?: number;
+  totalDuration?: number;
+}
+
+export interface PostProcessCompletedEventPayload {
+  jobId: string;
+  outputPath: string;
+  totalBytes: number;
+  duration?: number;
+  action: string;
+}
+
+export interface PostProcessFailedEventPayload {
+  jobId: string;
+  code: string;
+  message: string;
+  details?: Record<string, any>;
 }
 
 

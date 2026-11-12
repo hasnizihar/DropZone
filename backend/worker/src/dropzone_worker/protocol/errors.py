@@ -27,6 +27,12 @@ class ProtocolErrorCode:
     DOWNLOAD_ABORTED = "DOWNLOAD_ABORTED"
     FILE_WRITE_ERROR = "FILE_WRITE_ERROR"
 
+    # Post-Processing Error Codes (Milestone 7)
+    POSTPROCESS_FAILED = "POSTPROCESS_FAILED"
+    FFMPEG_MISSING = "FFMPEG_MISSING"
+    FFPROBE_MISSING = "FFPROBE_MISSING"
+    SOURCE_FILE_NOT_FOUND = "SOURCE_FILE_NOT_FOUND"
+
 class WorkerProtocolError(Exception):
     def __init__(self, code: str, message: str, details: dict = None):
         super().__init__(message)

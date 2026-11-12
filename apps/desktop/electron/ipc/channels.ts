@@ -12,6 +12,7 @@ export const IPC_CHANNELS = {
   DOWNLOADS_REMOVE: 'downloads:remove',
   DOWNLOADS_CLEAR_COMPLETED: 'downloads:clear-completed',
   DOWNLOADS_GET_ALL: 'downloads:get-all',
+  DOWNLOADS_POSTPROCESS: 'downloads:postprocess',
 
   // Batch
   BATCH_INSPECT_MULTIPLE: 'batch:inspect-multiple',
@@ -20,6 +21,7 @@ export const IPC_CHANNELS = {
   // System
   SYSTEM_GET_INFO: 'system:get-info',
   SYSTEM_GET_ENGINES: 'system:get-engines',
+  SYSTEM_GET_FFMPEG_INFO: 'system:get-ffmpeg-info',
   SYSTEM_SELECT_DIRECTORY: 'system:select-directory',
   SYSTEM_OPEN_PATH: 'system:open-path',
   SYSTEM_OPEN_FOLDER: 'system:open-folder',

@@ -11,6 +11,9 @@ export const WORKER_COMMANDS = {
   START_DOWNLOAD: 'start_download',
   CANCEL_DOWNLOAD: 'cancel_download',
   PAUSE_DOWNLOAD: 'pause_download',
+  GET_FFMPEG_INFO: 'get_ffmpeg_info',
+  POSTPROCESS_MEDIA: 'postprocess_media',
+  CANCEL_POSTPROCESS: 'cancel_postprocess',
 } as const;
 
 export type WorkerCommandName = typeof WORKER_COMMANDS[keyof typeof WORKER_COMMANDS] | string;
@@ -92,6 +95,47 @@ export interface PauseDownloadRequestPayload {
 export interface PauseDownloadResponsePayload {
   jobId: string;
   paused: boolean;
+  success: boolean;
+}
+
+export interface GetFfmpegInfoResponsePayload {
+  available: boolean;
+  version: string | null;
+  ffmpegPath: string | null;
+  ffprobePath: string | null;
+  probeAvailable: boolean;
+  supportedAudioFormats: string[];
+  supportedContainers: string[];
+}
+
+export interface PostProcessRequestPayload {
+  jobId: string;
+  inputPath: string;
+  action: 'extract_audio' | 'remux' | 'merge';
+  targetDirectory: string;
+  audioFormat?: 'mp3' | 'm4a' | 'wav' | 'flac' | 'opus';
+  audioBitrate?: string;
+  remuxContainer?: 'mp4' | 'mkv' | 'webm' | 'mov';
+  secondaryInputPath?: string;
+  customFilename?: string;
+  embedMetadata?: boolean;
+  metadata?: Record<string, any>;
+  thumbnailPath?: string;
+  preserveSource?: boolean;
+}
+
+export interface PostProcessResponsePayload {
+  success: boolean;
+  jobId: string;
+  outputPath: string;
+  totalBytes: number;
+  duration?: number;
+  action: string;
+}
+
+export interface CancelPostprocessResponsePayload {
+  jobId: string;
+  cancelled: boolean;
   success: boolean;
 }
 

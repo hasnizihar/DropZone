@@ -21,6 +21,10 @@ import {
   StartDownloadResponsePayload,
   CancelDownloadResponsePayload,
   PauseDownloadResponsePayload,
+  GetFfmpegInfoResponsePayload,
+  PostProcessRequestPayload,
+  PostProcessResponsePayload,
+  CancelPostprocessResponsePayload,
   DirectFileInfo,
   GalleryInfo,
   PlaylistInfo,
@@ -233,6 +237,33 @@ export class WorkerManager extends EventEmitter {
     );
   }
 
+  public async getFfmpegInfo(): Promise<GetFfmpegInfoResponsePayload> {
+    return this.sendRequest<GetFfmpegInfoResponsePayload>(
+      WORKER_COMMANDS.GET_FFMPEG_INFO,
+      {},
+      5000
+    );
+  }
+
+  public async postprocessMedia(
+    payload: PostProcessRequestPayload,
+    timeoutMs = 1800000 // 30 min default timeout for media post-processing
+  ): Promise<PostProcessResponsePayload> {
+    return this.sendRequest<PostProcessResponsePayload>(
+      WORKER_COMMANDS.POSTPROCESS_MEDIA,
+      payload,
+      timeoutMs
+    );
+  }
+
+  public async cancelPostprocess(jobId: string): Promise<CancelPostprocessResponsePayload> {
+    return this.sendRequest<CancelPostprocessResponsePayload>(
+      WORKER_COMMANDS.CANCEL_POSTPROCESS,
+      { jobId },
+      5000
+    );
+  }
+
   public async getStatus(): Promise<any> {
     if (this.healthMonitor.getState() === 'healthy') {
       try {
@@ -330,6 +361,14 @@ export class WorkerManager extends EventEmitter {
         this.emit('download-cancelled', event.payload);
       } else if (event.command === WORKER_EVENTS.DOWNLOAD_PAUSED) {
         this.emit('download-paused', event.payload);
+      } else if (event.command === WORKER_EVENTS.POSTPROCESS_STARTED) {
+        this.emit('postprocess-started', event.payload);
+      } else if (event.command === WORKER_EVENTS.POSTPROCESS_PROGRESS) {
+        this.emit('postprocess-progress', event.payload);
+      } else if (event.command === WORKER_EVENTS.POSTPROCESS_COMPLETED) {
+        this.emit('postprocess-completed', event.payload);
+      } else if (event.command === WORKER_EVENTS.POSTPROCESS_FAILED) {
+        this.emit('postprocess-failed', event.payload);
       }
       this.emit('worker-event', event);
     }

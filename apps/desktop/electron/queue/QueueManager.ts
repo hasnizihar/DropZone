@@ -10,6 +10,10 @@ import type {
   DownloadFailedEventPayload,
   DownloadCancelledEventPayload,
   DownloadPausedEventPayload,
+  PostProcessOptions,
+  PostProcessProgressEventPayload,
+  PostProcessCompletedEventPayload,
+  PostProcessFailedEventPayload,
 } from '@dropzone/shared';
 import { WorkerManager } from '../worker/WorkerManager';
 
@@ -97,6 +101,18 @@ export class QueueManager extends EventEmitter {
 
     this.workerManager.on('download-paused', (payload: DownloadPausedEventPayload) => {
       this.handleWorkerPaused(payload);
+    });
+
+    this.workerManager.on('postprocess-progress', (payload: PostProcessProgressEventPayload) => {
+      this.handleWorkerPostprocessProgress(payload);
+    });
+
+    this.workerManager.on('postprocess-completed', (payload: PostProcessCompletedEventPayload) => {
+      this.handleWorkerPostprocessCompleted(payload);
+    });
+
+    this.workerManager.on('postprocess-failed', (payload: PostProcessFailedEventPayload) => {
+      this.handleWorkerPostprocessFailed(payload);
     });
 
     // Handle worker process unexpected crash
@@ -287,6 +303,7 @@ export class QueueManager extends EventEmitter {
           targetDirectory: parentJob.targetDirectory,
           customFilename: filename,
           thumbnail: item.thumbnail,
+          postProcess: options.postProcess || (options.extractAudio ? { action: 'extract_audio', audioFormat: options.audioFormat || 'mp3', audioBitrate: options.audioBitrate || '192k' } : undefined),
           progress: 0,
           downloadedBytes: 0,
           totalBytes: 0,
@@ -355,6 +372,7 @@ export class QueueManager extends EventEmitter {
           selectedFormatId: item.selectedFormatId || 'best',
           targetDirectory: targetDir,
           customFilename: filename,
+          postProcess: item.postProcess || (item.extractAudio ? { action: 'extract_audio', audioFormat: item.audioFormat || 'mp3', audioBitrate: item.audioBitrate || '192k' } : undefined),
           progress: 0,
           downloadedBytes: 0,
           totalBytes: 0,
@@ -388,6 +406,7 @@ export class QueueManager extends EventEmitter {
       targetDirectory: options.targetDirectory || this.defaultDownloadDir,
       customFilename: options.customFilename,
       parentJobId: options.parentJobId,
+      postProcess: options.postProcess || (options.extractAudio ? { action: 'extract_audio', audioFormat: options.audioFormat || 'mp3', audioBitrate: options.audioBitrate || '192k' } : undefined),
       progress: 0,
       downloadedBytes: 0,
       totalBytes: 0,
@@ -460,6 +479,55 @@ export class QueueManager extends EventEmitter {
     return true;
   }
 
+  public async postprocessJob(
+    jobId: string,
+    options: PostProcessOptions
+  ): Promise<{ success: boolean; outputPath?: string; error?: string }> {
+    const job = this.jobs.get(jobId);
+    if (!job) {
+      return { success: false, error: `Job ${jobId} not found.` };
+    }
+
+    const inputPath = job.sourcePath || job.outputPath;
+    if (!inputPath || !fs.existsSync(inputPath)) {
+      return { success: false, error: 'Source file not found on disk for post-processing.' };
+    }
+
+    job.postProcess = options;
+    job.sourcePath = inputPath;
+    job.status = 'processing';
+    job.error = undefined;
+    job.processingProgress = 0;
+    job.processingStage = 'processing';
+    job.updatedAt = new Date().toISOString();
+    this.activeJobIds.add(job.id);
+    this.emit('job-updated', job);
+
+    try {
+      const res = await this.workerManager.postprocessMedia({
+        jobId: job.id,
+        inputPath,
+        action: options.action,
+        targetDirectory: job.targetDirectory || this.defaultDownloadDir,
+        audioFormat: options.audioFormat,
+        audioBitrate: options.audioBitrate,
+        remuxContainer: options.remuxContainer,
+        customFilename: job.customFilename,
+        embedMetadata: options.embedMetadata ?? true,
+        thumbnailPath: options.thumbnailPath,
+        preserveSource: options.preserveSource ?? false,
+      });
+      return { success: true, outputPath: res.outputPath };
+    } catch (err: any) {
+      this.handleWorkerPostprocessFailed({
+        jobId: job.id,
+        code: 'POSTPROCESS_FAILED',
+        message: err?.message || 'Postprocessing failed.',
+      });
+      return { success: false, error: err?.message };
+    }
+  }
+
   public async cancelJob(jobId: string): Promise<boolean> {
     const job = this.jobs.get(jobId);
     if (!job) return false;
@@ -476,7 +544,11 @@ export class QueueManager extends EventEmitter {
 
     if (this.activeJobIds.has(jobId)) {
       try {
-        await this.workerManager.cancelDownload(jobId);
+        if (job.status === 'processing') {
+          await this.workerManager.cancelPostprocess(jobId);
+        } else {
+          await this.workerManager.cancelDownload(jobId);
+        }
       } catch (e) {
         console.warn(`Failed to signal cancellation to worker for job ${jobId}:`, e);
       }
@@ -525,6 +597,42 @@ export class QueueManager extends EventEmitter {
         return true;
       }
       return false;
+    }
+
+    // Direct Postprocess Retry:
+    // If post-processing was requested and the source file is already downloaded and present on disk,
+    // retry post-processing directly without re-downloading!
+    if (job.postProcess && job.sourcePath && fs.existsSync(job.sourcePath)) {
+      job.status = 'processing';
+      job.error = undefined;
+      job.processingProgress = 0;
+      job.processingStage = 'processing';
+      job.speedBytesPerSec = 0;
+      job.etaSeconds = null;
+      job.updatedAt = new Date().toISOString();
+      this.activeJobIds.add(job.id);
+      this.emit('job-updated', job);
+
+      this.workerManager.postprocessMedia({
+        jobId: job.id,
+        inputPath: job.sourcePath,
+        action: job.postProcess.action,
+        targetDirectory: job.targetDirectory || this.defaultDownloadDir,
+        audioFormat: job.postProcess.audioFormat,
+        audioBitrate: job.postProcess.audioBitrate,
+        remuxContainer: job.postProcess.remuxContainer,
+        customFilename: job.customFilename,
+        embedMetadata: job.postProcess.embedMetadata ?? true,
+        thumbnailPath: job.postProcess.thumbnailPath,
+        preserveSource: job.postProcess.preserveSource ?? false,
+      }).catch((err) => {
+        this.handleWorkerPostprocessFailed({
+          jobId: job.id,
+          code: 'POSTPROCESS_FAILED',
+          message: err?.message || 'Postprocessing failed in worker.',
+        });
+      });
+      return true;
     }
 
     job.status = 'pending';
@@ -695,20 +803,126 @@ export class QueueManager extends EventEmitter {
     const job = this.jobs.get(payload.jobId);
     if (!job) return;
 
+    if (payload.totalBytes > 0) {
+      job.downloadedBytes = payload.totalBytes;
+      job.totalBytes = payload.totalBytes;
+    }
+    job.progress = 100;
+
+    // Check if post-processing is requested for this job
+    if (job.postProcess) {
+      job.status = 'processing';
+      job.sourcePath = payload.outputPath;
+      job.processingProgress = 0;
+      job.processingStage = 'processing';
+      job.speedBytesPerSec = 0;
+      job.etaSeconds = null;
+      job.updatedAt = new Date().toISOString();
+      this.emit('job-updated', job);
+
+      this.workerManager.postprocessMedia({
+        jobId: job.id,
+        inputPath: payload.outputPath,
+        action: job.postProcess.action,
+        targetDirectory: job.targetDirectory || this.defaultDownloadDir,
+        audioFormat: job.postProcess.audioFormat,
+        audioBitrate: job.postProcess.audioBitrate,
+        remuxContainer: job.postProcess.remuxContainer,
+        customFilename: job.customFilename,
+        embedMetadata: job.postProcess.embedMetadata ?? true,
+        thumbnailPath: job.postProcess.thumbnailPath,
+        preserveSource: job.postProcess.preserveSource ?? false,
+      }).catch((err) => {
+        this.handleWorkerPostprocessFailed({
+          jobId: job.id,
+          code: 'POSTPROCESS_FAILED',
+          message: err?.message || 'Postprocessing failed in worker.',
+        });
+      });
+      return;
+    }
+
+    job.status = 'completed';
+    job.speedBytesPerSec = 0;
+    job.etaSeconds = 0;
+    job.outputPath = payload.outputPath;
+    job.completedAt = new Date().toISOString();
+    job.updatedAt = new Date().toISOString();
+
+    this.activeJobIds.delete(job.id);
+    this.emit('job-completed', job);
+    this.emit('job-updated', job);
+
+    if (job.parentJobId) {
+      this.updateParentTerminalState(job.parentJobId);
+    }
+
+    this.processQueue();
+  }
+
+  private handleWorkerPostprocessProgress(payload: PostProcessProgressEventPayload): void {
+    const job = this.jobs.get(payload.jobId);
+    if (!job) return;
+
+    job.processingProgress = payload.progress;
+    job.processingStage = payload.stage;
+    job.updatedAt = new Date().toISOString();
+    this.emit('job-progress', job);
+    this.emit('job-updated', job);
+
+    if (job.parentJobId) {
+      const parent = this.jobs.get(job.parentJobId);
+      if (parent) {
+        parent.updatedAt = new Date().toISOString();
+        this.emit('job-progress', parent);
+      }
+    }
+  }
+
+  private handleWorkerPostprocessCompleted(payload: PostProcessCompletedEventPayload): void {
+    const job = this.jobs.get(payload.jobId);
+    if (!job) return;
+
     job.status = 'completed';
     job.progress = 100;
+    job.processingProgress = 100;
     job.speedBytesPerSec = 0;
     job.etaSeconds = 0;
     job.outputPath = payload.outputPath;
     if (payload.totalBytes > 0) {
-      job.downloadedBytes = payload.totalBytes;
       job.totalBytes = payload.totalBytes;
+      job.downloadedBytes = payload.totalBytes;
     }
     job.completedAt = new Date().toISOString();
     job.updatedAt = new Date().toISOString();
 
     this.activeJobIds.delete(job.id);
     this.emit('job-completed', job);
+    this.emit('job-updated', job);
+
+    if (job.parentJobId) {
+      this.updateParentTerminalState(job.parentJobId);
+    }
+
+    this.processQueue();
+  }
+
+  private handleWorkerPostprocessFailed(payload: PostProcessFailedEventPayload): void {
+    const job = this.jobs.get(payload.jobId);
+    if (!job) return;
+
+    job.status = 'failed';
+    job.speedBytesPerSec = 0;
+    job.etaSeconds = null;
+    job.error = {
+      code: payload.code,
+      message: payload.message,
+      details: payload.details ? JSON.stringify(payload.details) : undefined,
+    };
+    job.updatedAt = new Date().toISOString();
+
+    this.activeJobIds.delete(job.id);
+    this.emit('job-failed', job);
     this.emit('job-updated', job);
 
     if (job.parentJobId) {

@@ -9,6 +9,7 @@ import type {
   AppSettings,
   SystemEnginesReport,
   CreateDownloadOptions,
+  PostProcessOptions,
   AnalysisStatus,
 } from '@dropzone/shared';
 import { DEFAULT_SETTINGS } from '@dropzone/shared';
@@ -46,6 +47,15 @@ interface AppState {
   settings: AppSettings;
   toast: Toast | null;
   workerStatus: Record<string, any> | null;
+  ffmpegInfo: {
+    available: boolean;
+    version: string | null;
+    ffmpegPath: string | null;
+    ffprobePath: string | null;
+    probeAvailable: boolean;
+    supportedAudioFormats: string[];
+    supportedContainers: string[];
+  } | null;
 
   // Actions
   setActiveTab: (tab: NavigationTab) => void;
@@ -86,6 +96,10 @@ interface AppState {
   // Worker Actions (Milestone 2)
   fetchWorkerStatus: () => Promise<void>;
   restartWorker: () => Promise<void>;
+
+  // Post-Processing Actions (Milestone 7)
+  fetchFfmpegInfo: () => Promise<void>;
+  postprocessJob: (jobId: string, options: PostProcessOptions) => Promise<boolean>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -106,6 +120,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   toast: null,
   workerStatus: null,
+  ffmpegInfo: null,
 
   setActiveTab: (activeTab) => set({ activeTab }),
 
@@ -234,11 +249,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (typeof window === 'undefined' || !window.dropzone) return;
 
     try {
-      const [sysInfo, settings, jobs, workerStatus] = await Promise.all([
+      const [sysInfo, settings, jobs, workerStatus, ffmpegInfo] = await Promise.all([
         window.dropzone.getSystemInfo(),
         window.dropzone.getSettings(),
         window.dropzone.getAllJobs(),
         window.dropzone.getWorkerStatus ? window.dropzone.getWorkerStatus() : Promise.resolve(null),
+        window.dropzone.getFfmpegInfo ? window.dropzone.getFfmpegInfo() : Promise.resolve(null),
       ]);
 
       set({
@@ -246,6 +262,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         settings: settings || DEFAULT_SETTINGS,
         jobs: jobs || [],
         workerStatus,
+        ffmpegInfo: ffmpegInfo || null,
       });
 
       // Register live listeners
@@ -628,6 +645,37 @@ export const useAppStore = create<AppState>((set, get) => ({
         get().showToast(res.error || 'Failed to restart worker', 'error');
       }
     }
+  },
+
+  fetchFfmpegInfo: async () => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.getFfmpegInfo) {
+      try {
+        const info = await window.dropzone.getFfmpegInfo();
+        set({ ffmpegInfo: info });
+      } catch (err: any) {
+        console.warn('Failed to fetch FFmpeg info:', err);
+      }
+    }
+  },
+
+  postprocessJob: async (jobId: string, options: PostProcessOptions) => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.postprocessJob) {
+      get().showToast('Starting media post-processing...', 'info');
+      try {
+        const res = await window.dropzone.postprocessJob(jobId, options);
+        if (res.success) {
+          get().showToast('Post-processing completed successfully', 'success');
+          return true;
+        } else {
+          get().showToast(res.error || 'Post-processing failed', 'error');
+          return false;
+        }
+      } catch (err: any) {
+        get().showToast(err?.message || 'Failed to trigger post-processing', 'error');
+        return false;
+      }
+    }
+    return false;
   },
 }));
 

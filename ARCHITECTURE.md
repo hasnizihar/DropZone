@@ -209,3 +209,30 @@ Direct file downloads stream network bytes directly to disk in bounded 64 KB chu
   - Mixed completed/failed -> `failed` with `isPartialFailure: true` (`PARTIAL_FAILURE`).
 - **Partial Retry**: Retrying a parent container job resets and re-queues only failed or cancelled children, strictly preserving successful downloads.
 - Cascading cancellation and cascading removal ensure child jobs are never orphaned.
+
+## 8. FFmpeg Post-Processing & Audio Extraction Architecture (Milestone 7)
+
+### 8.1 Post-Processing Pipeline
+- **Dedicated Service Layer**: Implemented `FFmpegService` within the Python worker subprocess. Subprocesses run in dedicated threads within `ThreadPoolExecutor`, completely avoiding event loop or stdio protocol blockage.
+- **Pipeline Progression**: `URL Analysis → Download → Post-Processing → Verification (FFprobe) → Completed`.
+- **Atomic File Commit**:
+  1. Writes to temporary output (`.tmp.ext`).
+  2. Runs `probe_file` via `ffprobe` to verify non-zero size, valid container format, readable stream codecs, and valid duration.
+  3. Atomically replaces `.tmp.ext` to the final destination via `os.replace`.
+  4. On failure, incomplete temporary files are safely removed while preserving the source download.
+
+### 8.2 Supported Codecs & Remuxing Rules
+- **Audio Extraction**:
+  - MP3: `libmp3lame` (128k, 192k, 256k, 320k)
+  - M4A: `aac` (128k, 192k, 256k)
+  - WAV: `pcm_s16le`
+  - FLAC: `flac`
+  - OPUS: `libopus` (96k, 128k, 160k, 192k)
+- **Container Remuxing**: Supports MP4, MKV, WebM, and MOV containers. Automatically prioritizes stream copying (`-c copy`) to avoid transcoding quality loss.
+- **Stream Merging**: Combines separate video-only and audio-only streams into single synchronized files (`-map 0:v:0 -map 1:a:0 -c copy`).
+- **Metadata & Cover Art**: Embeds track titles, artists, albums, and dates; attaches album art using ID3v2 for MP3 and native stream attachments for FLAC.
+
+### 8.3 Authoritative Queue Integration & Direct Retry
+- **Processing Stage**: `QueueManager` manages the `processing` status between download completion and final success. Concurrency slots are released only when post-processing finishes.
+- **Cached Source Retention**: If post-processing fails, `sourcePath` is retained on disk. Calling `retryJob` skips redownloading entirely and re-executes post-processing directly from the local file.
+- **Process Cancellation**: Terminating or cancelling a processing job kills the underlying FFmpeg process tree cleanly via `psutil`, preventing zombie processes on Windows.

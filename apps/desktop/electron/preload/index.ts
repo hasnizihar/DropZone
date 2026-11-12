@@ -5,6 +5,7 @@ import type {
   AppSettings,
   DownloadJob,
   SystemEnginesReport,
+  PostProcessOptions,
 } from '@dropzone/shared';
 
 const dropzoneApi = {
@@ -21,6 +22,8 @@ const dropzoneApi = {
   removeJob: (jobId: string, deleteFile = false) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_REMOVE, jobId, deleteFile),
   clearCompletedJobs: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_CLEAR_COMPLETED),
   getAllJobs: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_GET_ALL),
+  postprocessJob: (jobId: string, options: PostProcessOptions) =>
+    ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_POSTPROCESS, jobId, options),
 
   // Batch
   inspectBatch: (urls: string[]) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_INSPECT_MULTIPLE, urls),
@@ -29,6 +32,7 @@ const dropzoneApi = {
 
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_INFO),
+  getFfmpegInfo: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_FFMPEG_INFO),
   selectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_SELECT_DIRECTORY),
   openPath: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_OPEN_PATH, path),
   openContainingFolder: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_OPEN_FOLDER, filePath),

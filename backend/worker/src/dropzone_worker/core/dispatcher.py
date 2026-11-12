@@ -21,6 +21,7 @@ from ..services.direct_http_service import DirectHttpService
 from ..services.direct_stream_engine import DirectStreamEngine
 from ..services.gallery_service import GalleryService
 from ..services.playlist_service import PlaylistService
+from ..services.ffmpeg_service import FFmpegService
 
 logger = logging.getLogger("dropzone_worker")
 
@@ -35,6 +36,7 @@ class CommandDispatcher:
         direct_stream_engine: Optional[DirectStreamEngine] = None,
         gallery_service: Optional[GalleryService] = None,
         playlist_service: Optional[PlaylistService] = None,
+        ffmpeg_service: Optional[FFmpegService] = None,
         write_message_fn: Optional[Callable[[ProtocolMessage], None]] = None,
         max_workers: int = 4,
     ):
@@ -50,6 +52,7 @@ class CommandDispatcher:
         )
         self.gallery_service = gallery_service or GalleryService(http_service=self.http_service)
         self.playlist_service = playlist_service or PlaylistService()
+        self.ffmpeg_service = ffmpeg_service or FFmpegService(write_event_fn=self._write_event)
         self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="worker_task")
 
         self._handlers = {
@@ -65,6 +68,9 @@ class CommandDispatcher:
             "start_download": self._handle_start_download,
             "cancel_download": self._handle_cancel_download,
             "pause_download": self._handle_pause_download,
+            "get_ffmpeg_info": self._handle_get_ffmpeg_info,
+            "postprocess_media": self._handle_postprocess_media,
+            "cancel_postprocess": self._handle_cancel_postprocess,
         }
 
     def _write_event(self, event_name: str, payload: Dict[str, Any]):
@@ -88,6 +94,10 @@ class CommandDispatcher:
 
         if cmd == "start_download" and self.write_message_fn:
             self._dispatch_async_download(request)
+            return None
+
+        if cmd == "postprocess_media" and self.write_message_fn:
+            self._dispatch_async_postprocess(request)
             return None
 
         # Synchronous dispatch
@@ -289,6 +299,54 @@ class CommandDispatcher:
 
         self.executor.submit(_download_task)
 
+    def _dispatch_async_postprocess(self, request: ProtocolMessage):
+        payload = request.payload or {}
+        job_id = payload.get("jobId")
+        input_path = payload.get("inputPath")
+        action = payload.get("action", "extract_audio")
+        target_dir = payload.get("targetDirectory")
+        audio_format = payload.get("audioFormat", "mp3")
+        audio_bitrate = payload.get("audioBitrate", "192k")
+        remux_container = payload.get("remuxContainer", "mp4")
+        secondary_input = payload.get("secondaryInputPath")
+        custom_filename = payload.get("customFilename")
+        embed_metadata = bool(payload.get("embedMetadata", True))
+        metadata = payload.get("metadata")
+        thumbnail_path = payload.get("thumbnailPath")
+        preserve_source = bool(payload.get("preserveSource", False))
+
+        def _postprocess_task():
+            try:
+                res = self.ffmpeg_service.execute_postprocess(
+                    job_id=job_id,
+                    input_path=input_path,
+                    action=action,
+                    target_directory=target_dir,
+                    audio_format=audio_format,
+                    audio_bitrate=audio_bitrate,
+                    remux_container=remux_container,
+                    secondary_input_path=secondary_input,
+                    custom_filename=custom_filename,
+                    embed_metadata=embed_metadata,
+                    metadata=metadata,
+                    thumbnail_path=thumbnail_path,
+                    preserve_source=preserve_source,
+                )
+                self._safe_write(create_response(request.id, request.command, res))
+            except WorkerProtocolError as err:
+                self.health.record_error()
+                self._safe_write(
+                    create_error(request.id, err.code, err.message, err.details, command=request.command)
+                )
+            except Exception as exc:
+                self.health.record_error()
+                logger.error(f"Unexpected error in async postprocess for {job_id}: {exc}", exc_info=True)
+                self._safe_write(
+                    create_error(request.id, ProtocolErrorCode.INTERNAL_ERROR, str(exc), command=request.command)
+                )
+
+        self.executor.submit(_postprocess_task)
+
     def _safe_write(self, msg: ProtocolMessage):
         if self.write_message_fn:
             try:
@@ -317,9 +375,13 @@ class CommandDispatcher:
                 "start_download",
                 "cancel_download",
                 "pause_download",
+                "get_ffmpeg_info",
+                "postprocess_media",
+                "cancel_postprocess",
             ],
             "pid": self.health.get_status_payload()["pid"],
             "ytdlpVersion": self.analyzer.engine.version,
+            "ffmpeg": self.ffmpeg_service.get_status(),
         }
 
     def _handle_ping(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -332,6 +394,7 @@ class CommandDispatcher:
     def _handle_get_status(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         status_info = self.health.get_status_payload()
         status_info["ytdlpVersion"] = self.analyzer.engine.version
+        status_info["ffmpeg"] = self.ffmpeg_service.get_status()
         for cap in [
             "analyze_url",
             "inspect_direct_url",
@@ -341,6 +404,9 @@ class CommandDispatcher:
             "start_download",
             "cancel_download",
             "pause_download",
+            "get_ffmpeg_info",
+            "postprocess_media",
+            "cancel_postprocess",
         ]:
             if cap not in status_info["capabilities"]:
                 status_info["capabilities"].append(cap)
@@ -457,7 +523,11 @@ class CommandDispatcher:
         job_id = payload.get("jobId")
         if not job_id:
             raise WorkerProtocolError(ProtocolErrorCode.VALIDATION_ERROR, "Missing 'jobId' in cancel_download request")
-        cancelled = self.direct_stream_engine.cancel_download(job_id) or self.download_service.cancel_download(job_id)
+        cancelled = (
+            self.direct_stream_engine.cancel_download(job_id)
+            or self.download_service.cancel_download(job_id)
+            or self.ffmpeg_service.cancel_postprocess(job_id)
+        )
         return {"jobId": job_id, "cancelled": cancelled, "success": cancelled}
 
     def _handle_pause_download(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -466,3 +536,37 @@ class CommandDispatcher:
             raise WorkerProtocolError(ProtocolErrorCode.VALIDATION_ERROR, "Missing 'jobId' in pause_download request")
         paused = self.direct_stream_engine.pause_download(job_id) or self.download_service.pause_download(job_id)
         return {"jobId": job_id, "paused": paused, "success": paused}
+
+    def _handle_get_ffmpeg_info(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        return self.ffmpeg_service.get_status()
+
+    def _handle_postprocess_media(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        job_id = payload.get("jobId")
+        input_path = payload.get("inputPath")
+        if not job_id or not input_path:
+            raise WorkerProtocolError(
+                ProtocolErrorCode.VALIDATION_ERROR,
+                "Missing 'jobId' or 'inputPath' in postprocess_media request"
+            )
+        return self.ffmpeg_service.execute_postprocess(
+            job_id=job_id,
+            input_path=input_path,
+            action=payload.get("action", "extract_audio"),
+            target_directory=payload.get("targetDirectory"),
+            audio_format=payload.get("audioFormat", "mp3"),
+            audio_bitrate=payload.get("audioBitrate", "192k"),
+            remux_container=payload.get("remuxContainer", "mp4"),
+            secondary_input_path=payload.get("secondaryInputPath"),
+            custom_filename=payload.get("customFilename"),
+            embed_metadata=bool(payload.get("embedMetadata", True)),
+            metadata=payload.get("metadata"),
+            thumbnail_path=payload.get("thumbnailPath"),
+            preserve_source=bool(payload.get("preserveSource", False)),
+        )
+
+    def _handle_cancel_postprocess(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        job_id = payload.get("jobId")
+        if not job_id:
+            raise WorkerProtocolError(ProtocolErrorCode.VALIDATION_ERROR, "Missing 'jobId' in cancel_postprocess request")
+        cancelled = self.ffmpeg_service.cancel_postprocess(job_id)
+        return {"jobId": job_id, "cancelled": cancelled, "success": cancelled}
