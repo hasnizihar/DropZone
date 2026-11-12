@@ -10,16 +10,23 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - `webSecurity` is enabled.
    - External navigation and new window creations (`window.open`) are intercepted and opened exclusively via the native OS shell (`shell.openExternal`) after origin validation.
 
-2. **IPC Validation**
+2. **IPC Validation & Least Privilege**
    - The preload script exposes only explicit whitelisted methods via `contextBridge.exposeInMainWorld('dropzone', ...)`.
-   - All payloads received in the main process are validated against expected schemas before processing.
+   - All incoming IPC requests are validated before processing.
+   - React components never have direct access to `child_process`, `fs`, or Node builtins.
 
-3. **Filesystem & Subprocess Security**
-   - No arbitrary command execution is allowed.
-   - Download destination paths are normalized and checked to prevent path traversal (`..` escapes).
+3. **Subprocess Isolation & Secure Execution**
+   - Python worker is spawned with `shell: false` and strict arguments array to prevent command injection.
+   - Communication with the worker occurs strictly over standard I/O via single-line JSON objects.
+   - The worker protocol strictly rejects any command not defined in its dispatcher table (`UNKNOWN_COMMAND`).
+   - Line length limits (2MB maximum) protect against memory exhaustion from oversized payloads.
+
+4. **Filesystem & Path Security**
+   - Download destination paths are normalized to prevent path traversal (`..` escapes).
    - Filenames are sanitized, stripping invalid Windows characters (`\ / : * ? " < > |`) and control characters.
    - Downloaded files are never automatically executed upon completion.
 
-4. **Credential & Privacy Protection**
+5. **Credential & Privacy Protection**
+   - Worker stdout is reserved for protocol messages; all logging goes to stderr.
    - Logs never record authentication tokens, cookies, or user credentials.
-   - Diagnostic stderr output is scrubbed of sensitive URL query parameters where applicable.
+   - Diagnostic output is scrubbed of sensitive query parameters where applicable.

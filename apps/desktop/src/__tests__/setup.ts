@@ -82,3 +82,4 @@ const mockDropzone = {
 
 // @ts-ignore
 window.dropzone = mockDropzone;
+

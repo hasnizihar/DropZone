@@ -52,3 +52,4 @@ describe('Application Shell UI Components', () => {
     expect(screen.getByText('Analyze URL')).toBeDefined();
   });
 });
+

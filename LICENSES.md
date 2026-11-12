@@ -12,3 +12,4 @@ DROPZONE is open-source software licensed under the MIT License.
 - **FFmpeg**: LGPL 2.1+ / GPL 2.0+ (Copyright FFmpeg developers)
 - **Pydantic**: MIT License (Copyright Samuel Colvin)
 - **Zod**: MIT License (Copyright Colin McDonnell)
+

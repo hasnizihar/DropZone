@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Shield,
   Zap,
+  RotateCcw,
+  Activity,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -15,8 +17,12 @@ export const SettingsPage: React.FC = () => {
   const updateSettings = useAppStore((state) => state.updateSettings);
   const selectDownloadDirectory = useAppStore((state) => state.selectDownloadDirectory);
   const systemInfo = useAppStore((state) => state.systemInfo);
+  const workerStatus = useAppStore((state) => state.workerStatus);
+  const restartWorker = useAppStore((state) => state.restartWorker);
 
   const engines = systemInfo?.engines;
+  const workerState = workerStatus?.state || (workerStatus?.isAlive ? 'healthy' : 'stopped');
+  const isWorkerHealthy = workerState === 'healthy';
 
   return (
     <div className="p-8 space-y-8 max-w-4xl mx-auto">
@@ -150,6 +156,60 @@ export const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Python Background Worker Telemetry (Milestone 2) */}
+      <div className="bg-brand-surface border border-brand-border rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold uppercase tracking-wider text-brand-lime flex items-center space-x-2">
+            <Activity className="w-4 h-4" />
+            <span>Python Worker Subprocess (JSON Lines Protocol)</span>
+          </h3>
+
+          <button
+            onClick={() => restartWorker()}
+            className="px-3 py-1.5 bg-brand-black border border-brand-border hover:border-brand-lime/50 text-xs font-semibold text-brand-white rounded-lg flex items-center space-x-1.5 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3 text-brand-lime" />
+            <span>Restart Worker</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 font-mono text-xs">
+          <div className="bg-brand-black border border-brand-border rounded-lg p-3">
+            <div className="text-[10px] text-brand-grey uppercase">Worker State</div>
+            <div className={`font-bold mt-1 uppercase ${isWorkerHealthy ? 'text-brand-lime' : 'text-amber-400'}`}>
+              {workerState}
+            </div>
+          </div>
+
+          <div className="bg-brand-black border border-brand-border rounded-lg p-3">
+            <div className="text-[10px] text-brand-grey uppercase">Process ID (PID)</div>
+            <div className="text-brand-white font-bold mt-1">
+              {workerStatus?.pid || 'N/A'}
+            </div>
+          </div>
+
+          <div className="bg-brand-black border border-brand-border rounded-lg p-3">
+            <div className="text-[10px] text-brand-grey uppercase">Worker Uptime</div>
+            <div className="text-brand-white font-bold mt-1">
+              {workerStatus?.uptimeSeconds !== undefined ? `${workerStatus.uptimeSeconds}s` : '0s'}
+            </div>
+          </div>
+
+          <div className="bg-brand-black border border-brand-border rounded-lg p-3">
+            <div className="text-[10px] text-brand-grey uppercase">Crash Restarts</div>
+            <div className="text-brand-white font-bold mt-1">
+              {workerStatus?.restartCount ?? 0} / 3
+            </div>
+          </div>
+        </div>
+
+        <div className="text-[11px] text-brand-grey flex justify-between pt-1 border-t border-brand-border/60">
+          <span>Protocol: JSON Lines v1.0 (stdio)</span>
+          <span>Last Heartbeat: {workerStatus?.lastHeartbeatTime ? new Date(workerStatus.lastHeartbeatTime).toLocaleTimeString() : 'Active'}</span>
+        </div>
+      </div>
     </div>
   );
 };
+

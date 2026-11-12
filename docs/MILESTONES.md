@@ -18,13 +18,14 @@ This document tracks progress through the 10 core milestones defined in the DROP
 
 ---
 
-## Milestone 2: Worker Foundation
-- **Status:** Pending
+## Milestone 2: Worker Foundation & JSON Lines Protocol
+- **Status:** Completed (2026-11-12)
 - **Scope:**
-  - Python worker core (`backend/worker/main.py`).
-  - Robust JSON Lines bidirectional protocol (stdin/stdout).
-  - Electron worker process manager with lifecycle management, heartbeat ping/pong, crash recovery, and auto-restart.
-  - Worker test suite (`pytest`).
+  - Implemented modular Python background worker in `backend/worker/src/dropzone_worker/` with `bootstrap.py`, `__main__.py`, protocol models, parser, serializer, command dispatcher (`hello`, `ping`, `get_status`, `shutdown`), and isolated stderr logging.
+  - Defined strongly-typed TypeScript protocol contracts and Zod schemas in `packages/shared/src/protocol/`.
+  - Implemented Electron `WorkerManager`, `WorkerProcess`, `WorkerHealthMonitor`, and streaming JSON Lines parser with request/response correlation, heartbeat ping/pong (5s interval, 3s timeout), and automatic crash recovery with exponential backoff (max 3 restarts).
+  - Wired worker lifecycle and telemetry into Electron main process, secure preload IPC bridge, Zustand state store, and Settings / Sidebar UI with manual worker restart action.
+  - Verified acceptance: 13/13 Pytest tests passing, 18/18 Vitest tests passing (including full integration test spawning the Python subprocess), clean TypeScript typecheck across all workspaces, production build, and Electron startup smoke test.
 
 ---
 

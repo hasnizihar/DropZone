@@ -4,7 +4,7 @@
 - [x] Project Foundation & Workspace Setup (Milestone 1)
 - [x] Modern Dark UI Shell with Acid Lime Accent (Milestone 1)
 - [x] Typed Secure IPC Bridge (Milestone 1)
-- [ ] Python Worker & JSON Lines Heartbeat Protocol (Milestone 2)
+- [x] Python Worker & JSON Lines Heartbeat Protocol (Milestone 2)
 - [ ] yt-dlp Video & Audio Extraction (Milestone 3)
 - [ ] Download Queue State Machine & Scheduler (Milestone 4)
 - [ ] Direct HTTP/HTTPS Chunked Downloader with Resume (Milestone 5)
@@ -20,3 +20,4 @@
 - Browser extension for one-click download redirection into DROPZONE.
 - Bandwidth scheduling (night-time download windows).
 - Torrent / P2P provider adapter.
+

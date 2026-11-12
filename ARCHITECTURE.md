@@ -15,7 +15,7 @@ DROPZONE is structured as a multi-tier, local-first desktop application with dis
 |   |  - Dashboard      |  |   - Job Queue State           |  |
 |   |  - URL Analyzer   |  |   - UI Notifications          |  |
 |   |  - Downloads View |  |   - System Engine Status      |  |
-|   |  - Batch Process  |  |   - User Settings             |  |
+|   |  - Batch Process  |  |   - Worker Subprocess Status  |  |
 |   +-------------------+  +-------------------------------+  |
 +-------------------------------------------------------------+
                               |
@@ -32,9 +32,11 @@ DROPZONE is structured as a multi-tier, local-first desktop application with dis
 |                              |                              |
 |                              v                              |
 |                  +-----------------------+                  |
-|                  | Worker Subprocess Mgr |                  |
+|                  |     WorkerManager     |                  |
+|                  | - Process Lifecycle   |                  |
+|                  | - JSON Lines Protocol |                  |
 |                  | - Heartbeat Ping/Pong |                  |
-|                  | - Stdin/Stdout JSONL  |                  |
+|                  | - Crash Auto-Recovery |                  |
 |                  +-----------------------+                  |
 +-------------------------------------------------------------+
                               |
@@ -46,45 +48,67 @@ DROPZONE is structured as a multi-tier, local-first desktop application with dis
 |  +-------------------------------------------------------+  |
 |  |                  Dispatch Controller                  |  |
 |  +-------------------------------------------------------+  |
-|         |                   |                    |          |
-|         v                   v                    v          |
-|  +---------------+  +-----------------+  +---------------+  |
-|  | yt-dlp Engine |  | Direct HTTP Strm|  | FFmpeg Engine |  |
-|  |  (Media & PL) |  | (Chunked/Resume)|  | (Mux/Convert) |  |
-|  +---------------+  +-----------------+  +---------------+  |
+|    - Bootstrap & Logging Isolation (stderr)                 |
+|    - Protocol Parser & Compact JSON Serializer              |
+|    - Command Handlers: hello, ping, get_status, shutdown    |
+|    - Health Monitor & Telemetry                             |
+|    - Signal & Lifecycle Handlers                            |
 +-------------------------------------------------------------+
 ```
 
 ---
 
-## 2. Layer Definitions
+## 2. Process Boundary & Worker Lifecycle
 
-### Layer A: Renderer (React + TypeScript + Vite + Tailwind)
-- Runs in a fully sandboxed Chromium process (`nodeIntegration: false`, `contextIsolation: true`).
-- Does not have direct filesystem or OS access.
-- Interacts strictly through `window.dropzone` typed bridge.
-- Uses Zustand stores for reactive queue updates and metrics streaming.
+### 2.1 Single State Authority
+Electron Main is the sole authoritative owner of application state and download job state. The Python worker functions as a stateless command executor and asynchronous event emitter.
 
-### Layer B: Main Process (Electron)
-- Orchestrates window lifecycle, native dialogs, shell file execution, and tray.
-- Validates all incoming IPC calls with strict runtime schemas.
-- Manages the lifecycle of the Python background worker.
+### 2.2 Worker Lifecycle States
+```
+STOPPED ──► STARTING ──► [worker.ready / hello] ──► HEALTHY
+                            │                         │
+                            ▼                         ├── Heartbeat timeout ──► DEGRADED
+                         FAILED                       │                             │
+                                                      │ (consecutive failures >= 3) ▼
+                                                      ├──────────────────────► UNHEALTHY
+                                                      │                             │
+                                                      │                             ▼
+                                                      │                        RESTARTING
+                                                      │                             │
+                                                      │                             ▼
+                                                      │                         STARTING
+                                                      ▼
+                                              graceful shutdown ──► STOPPING ──► STOPPED
+```
 
-### Layer C: Download Queue & State Machine
-- Manages job states:
-  - `pending` -> `analyzing` -> `ready` -> `downloading` -> `completed`
-  - Side branches: `paused`, `cancelled`, `failed`
-- Enforces user-configured concurrency (default: 3 concurrent jobs).
-- Computes aggregated download speed, total downloaded bytes, and time estimates.
+### 2.3 JSON Lines (JSONL) Protocol Specification
+Communication over standard input/output follows the DROPZONE Protocol v1.0. Every line is an independent JSON object terminated by `\n`:
 
-### Layer D: Python Worker Subprocess
-- Decouples long-running media extraction and streaming downloads from the UI.
-- Communicates via newline-delimited JSON (JSON Lines) over `stdin` and `stdout`.
-- Stderr is dedicated to diagnostic logging and does not pollute the IPC stream.
-- Crashes in the Python worker are detected via heartbeat pings and automatically recovered.
+```json
+{
+  "protocolVersion": "1.0",
+  "id": "req_1710000000_abc123_1",
+  "type": "request",
+  "command": "ping",
+  "payload": {},
+  "timestamp": "2026-11-12T12:00:00Z"
+}
+```
 
-### Layer E: Storage Layer
-- Local SQLite database persists download history, queue metadata, engine versions, and user preferences across application reboots.
+- **Stdout**: Dedicated exclusively to newline-delimited protocol JSON objects.
+- **Stderr**: Dedicated exclusively to diagnostic logs and tracebacks.
+
+### 2.4 Heartbeat & Health Telemetry
+- Heartbeat interval: **5 seconds**.
+- Heartbeat response timeout: **3 seconds**.
+- Maximum consecutive failures before marking `unhealthy`: **3**.
+- State returns to `healthy` automatically upon the next successful ping.
+
+### 2.5 Crash Recovery
+- Unexpected subprocess exits trigger an immediate rejection of all pending requests with `WorkerCrashError`.
+- Exponential backoff is calculated: `min(1000 * 2^(attempt-1), 15000)ms`.
+- Maximum automatic restarts: **3**.
+- Intentional shutdowns (`stop()`, app quit) cancel recovery attempts and clean up child processes gracefully.
 
 ---
 
@@ -92,3 +116,4 @@ DROPZONE is structured as a multi-tier, local-first desktop application with dis
 - Preload script uses `contextBridge.exposeInMainWorld` to expose only safe, explicit methods.
 - URLs submitted to the analyzer are validated against known protocols (http, https).
 - Target file paths are sanitized to prevent directory traversal attacks (`..`).
+- Subprocess spawning uses `child_process.spawn()` with `shell: false` and strict argument arrays.

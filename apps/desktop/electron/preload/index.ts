@@ -36,7 +36,29 @@ const dropzoneApi = {
   getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
   updateSettings: (settings: Partial<AppSettings>) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE, settings),
 
+  // Worker Subprocess (Milestone 2)
+  startWorker: () => ipcRenderer.invoke(IPC_CHANNELS.WORKER_START),
+  stopWorker: () => ipcRenderer.invoke(IPC_CHANNELS.WORKER_STOP),
+  getWorkerStatus: () => ipcRenderer.invoke(IPC_CHANNELS.WORKER_GET_STATUS),
+  checkWorkerHealth: () => ipcRenderer.invoke(IPC_CHANNELS.WORKER_HEALTH_CHECK),
+  restartWorker: () => ipcRenderer.invoke(IPC_CHANNELS.WORKER_RESTART),
+
   // Events (Main -> Renderer)
+  onWorkerStatusChanged: (callback: (status: Record<string, any>) => void) => {
+    const handler = (_event: any, status: Record<string, any>) => callback(status);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_WORKER_STATUS_CHANGED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_WORKER_STATUS_CHANGED, handler);
+    };
+  },
+
+  onWorkerError: (callback: (error: Record<string, any>) => void) => {
+    const handler = (_event: any, error: Record<string, any>) => callback(error);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_WORKER_ERROR, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_WORKER_ERROR, handler);
+    };
+  },
   onDownloadProgress: (callback: (job: DownloadJob) => void) => {
     const handler = (_event: any, job: DownloadJob) => callback(job);
     ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOAD_PROGRESS, handler);
@@ -72,3 +94,4 @@ const dropzoneApi = {
 
 // Expose protected API to renderer
 contextBridge.exposeInMainWorld('dropzone', dropzoneApi);
+

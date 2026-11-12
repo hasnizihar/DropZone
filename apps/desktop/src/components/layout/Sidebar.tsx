@@ -23,6 +23,7 @@ export const Sidebar: React.FC = () => {
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const jobs = useAppStore((state) => state.jobs);
   const systemInfo = useAppStore((state) => state.systemInfo);
+  const workerStatus = useAppStore((state) => state.workerStatus);
 
   const activeCount = jobs.filter(
     (j) => j.status === 'downloading' || j.status === 'pending'
@@ -41,6 +42,8 @@ export const Sidebar: React.FC = () => {
   const ytdlpOk = systemInfo?.engines?.ytdlp?.isAvailable;
   const ffmpegOk = systemInfo?.engines?.ffmpeg?.isAvailable;
   const pythonOk = systemInfo?.engines?.python?.isAvailable;
+  const workerState = workerStatus?.state || (workerStatus?.isAlive ? 'healthy' : 'starting');
+  const workerOk = workerState === 'healthy';
 
   return (
     <aside className="w-56 bg-brand-surface border-r border-brand-border flex flex-col justify-between py-4 select-none">
@@ -89,11 +92,17 @@ export const Sidebar: React.FC = () => {
           <span>Engine Status</span>
           <Circle
             className={`w-2 h-2 fill-current ${
-              ytdlpOk && ffmpegOk && pythonOk ? 'text-brand-lime' : 'text-amber-400'
+              ytdlpOk && ffmpegOk && workerOk ? 'text-brand-lime' : 'text-amber-400'
             }`}
           />
         </div>
         <div className="space-y-1.5 text-xs text-brand-grey font-mono">
+          <div className="flex justify-between items-center">
+            <span>Worker:</span>
+            <span className={workerOk ? 'text-brand-lime font-bold' : 'text-amber-400 font-bold'}>
+              {workerState}
+            </span>
+          </div>
           <div className="flex justify-between items-center">
             <span>yt-dlp:</span>
             <span className={ytdlpOk ? 'text-brand-lime' : 'text-amber-400'}>
@@ -111,3 +120,4 @@ export const Sidebar: React.FC = () => {
     </aside>
   );
 };
+

@@ -49,3 +49,4 @@ export const TitleBar: React.FC = () => {
     </div>
   );
 };
+

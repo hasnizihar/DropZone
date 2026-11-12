@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export * from './protocol';
+
 // ==========================================
 // 1. BRAND & THEME TOKENS
 // ==========================================
@@ -223,6 +225,13 @@ export interface IpcRendererToMainApi {
   // Settings
   getSettings(): Promise<AppSettings>;
   updateSettings(settings: Partial<AppSettings>): Promise<AppSettings>;
+
+  // Worker Subprocess (Milestone 2)
+  startWorker(): Promise<{ success: boolean; error?: string }>;
+  stopWorker(): Promise<{ success: boolean; error?: string }>;
+  getWorkerStatus(): Promise<Record<string, any>>;
+  checkWorkerHealth(): Promise<{ ok: boolean; latencyMs?: number; error?: string }>;
+  restartWorker(): Promise<{ success: boolean; error?: string }>;
 }
 
 // Window Bridge
@@ -233,6 +242,9 @@ declare global {
       onDownloadCompleted(callback: (job: DownloadJob) => void): () => void;
       onDownloadFailed(callback: (job: DownloadJob) => void): () => void;
       onEngineStatusChanged(callback: (report: SystemEnginesReport) => void): () => void;
+      onWorkerStatusChanged(callback: (status: Record<string, any>) => void): () => void;
+      onWorkerError(callback: (error: Record<string, any>) => void): () => void;
     };
   }
 }
+

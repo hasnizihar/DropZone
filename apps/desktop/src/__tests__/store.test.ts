@@ -58,3 +58,4 @@ describe('App State Store', () => {
     expect(useAppStore.getState().jobs[0].status).toBe('pending');
   });
 });
+

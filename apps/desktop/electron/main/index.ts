@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { IPC_CHANNELS } from '../ipc/channels';
 import { getSystemEnginesReport } from './engines';
+import { WorkerManager } from '../worker/WorkerManager';
 import type {
   AppSettings,
   DownloadJob,
@@ -11,6 +12,7 @@ import type {
 } from '@dropzone/shared';
 
 let mainWindow: BrowserWindow | null = null;
+const workerManager = new WorkerManager();
 
 // Initial application settings
 const defaultDownloadDir = path.join(app.getPath('downloads'), 'DropZone');
@@ -367,12 +369,72 @@ function setupIpcHandlers() {
     }
     return { success: true, jobIds };
   });
+
+  // Worker Subprocess (Milestone 2)
+  ipcMain.handle(IPC_CHANNELS.WORKER_START, async () => {
+    try {
+      await workerManager.start();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.WORKER_STOP, async () => {
+    try {
+      await workerManager.stop();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.WORKER_GET_STATUS, async () => {
+    return await workerManager.getStatus();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.WORKER_HEALTH_CHECK, async () => {
+    try {
+      const t0 = Date.now();
+      await workerManager.sendPing();
+      return { ok: true, latencyMs: Date.now() - t0 };
+    } catch (err: any) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.WORKER_RESTART, async () => {
+    try {
+      await workerManager.restart();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  });
 }
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   setupIpcHandlers();
   mainWindow = createWindow();
+
+  // Forward worker events to renderer
+  workerManager.on('status-changed', (status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_WORKER_STATUS_CHANGED, status);
+    }
+  });
+
+  workerManager.on('worker-error', (err) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_WORKER_ERROR, err);
+    }
+  });
+
+  // Start background worker
+  workerManager.start().catch((err) => {
+    console.error('[Worker Boot Error]', err);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -381,8 +443,17 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', async () => {
+  try {
+    await workerManager.stop();
+  } catch (err) {
+    console.error('Error stopping worker during quit:', err);
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
+

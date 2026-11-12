@@ -32,6 +32,7 @@ interface AppState {
   systemInfo: { version: string; platform: string; engines: SystemEnginesReport } | null;
   settings: AppSettings;
   toast: Toast | null;
+  workerStatus: Record<string, any> | null;
 
   // Actions
   setActiveTab: (tab: NavigationTab) => void;
@@ -54,6 +55,10 @@ interface AppState {
   openPath: (path: string) => Promise<boolean>;
   openFolder: (filePath: string) => Promise<boolean>;
   windowControl: (action: 'minimize' | 'maximize' | 'close') => void;
+
+  // Worker Actions (Milestone 2)
+  fetchWorkerStatus: () => Promise<void>;
+  restartWorker: () => Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -65,6 +70,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   systemInfo: null,
   settings: DEFAULT_SETTINGS,
   toast: null,
+  workerStatus: null,
 
   setActiveTab: (activeTab) => set({ activeTab }),
 
@@ -86,16 +92,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (typeof window === 'undefined' || !window.dropzone) return;
 
     try {
-      const [sysInfo, settings, jobs] = await Promise.all([
+      const [sysInfo, settings, jobs, workerStatus] = await Promise.all([
         window.dropzone.getSystemInfo(),
         window.dropzone.getSettings(),
         window.dropzone.getAllJobs(),
+        window.dropzone.getWorkerStatus ? window.dropzone.getWorkerStatus() : Promise.resolve(null),
       ]);
 
       set({
         systemInfo: sysInfo,
         settings: settings || DEFAULT_SETTINGS,
         jobs: jobs || [],
+        workerStatus,
       });
 
       // Register live listeners
@@ -124,6 +132,19 @@ export const useAppStore = create<AppState>((set, get) => ({
           systemInfo: state.systemInfo ? { ...state.systemInfo, engines: report } : null,
         }));
       });
+
+      // Worker Subprocess listeners (Milestone 2)
+      if (window.dropzone.onWorkerStatusChanged) {
+        window.dropzone.onWorkerStatusChanged((status) => {
+          set({ workerStatus: status });
+        });
+      }
+
+      if (window.dropzone.onWorkerError) {
+        window.dropzone.onWorkerError((err) => {
+          get().showToast(err.payload?.message || 'Worker error occurred', 'error');
+        });
+      }
     } catch (err: any) {
       console.error('Failed to initialize desktop store:', err);
     }
@@ -265,4 +286,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       (window.dropzone as any).windowControl?.(action);
     }
   },
+
+  fetchWorkerStatus: async () => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.getWorkerStatus) {
+      const status = await window.dropzone.getWorkerStatus();
+      set({ workerStatus: status });
+    }
+  },
+
+  restartWorker: async () => {
+    if (typeof window !== 'undefined' && window.dropzone && window.dropzone.restartWorker) {
+      get().showToast('Restarting Python worker...', 'info');
+      const res = await window.dropzone.restartWorker();
+      if (res.success) {
+        get().showToast('Python worker restarted successfully', 'success');
+        await get().fetchWorkerStatus();
+      } else {
+        get().showToast(res.error || 'Failed to restart worker', 'error');
+      }
+    }
+  },
 }));
+

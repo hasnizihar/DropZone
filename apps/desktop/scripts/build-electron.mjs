@@ -35,3 +35,4 @@ try {
   console.error('Failed to compile electron:', err);
   process.exit(1);
 }
+
