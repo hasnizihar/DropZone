@@ -6,6 +6,8 @@ export const WORKER_COMMANDS = {
   ANALYZE_URL: 'analyze_url',
   INSPECT_DIRECT_URL: 'inspect_direct_url',
   INSPECT_GALLERY: 'inspect_gallery',
+  INSPECT_PLAYLIST: 'inspect_playlist',
+  INSPECT_BATCH: 'inspect_batch',
   START_DOWNLOAD: 'start_download',
   CANCEL_DOWNLOAD: 'cancel_download',
   PAUSE_DOWNLOAD: 'pause_download',
@@ -59,7 +61,7 @@ export interface ShutdownResponsePayload {
 export interface StartDownloadRequestPayload {
   jobId: string;
   url: string;
-  engine?: 'yt-dlp' | 'direct-http' | 'image-gallery' | 'image' | 'ffmpeg';
+  engine?: 'yt-dlp' | 'direct-http' | 'image-gallery' | 'playlist' | 'batch' | 'image' | 'ffmpeg';
   formatId?: string;
   targetDirectory: string;
   customFilename?: string;

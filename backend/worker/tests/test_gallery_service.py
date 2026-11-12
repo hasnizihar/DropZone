@@ -64,3 +64,4 @@ def test_extract_gallery_unsupported_url():
         with pytest.raises(WorkerProtocolError) as exc_info:
             svc.extract_gallery_or_image("https://unsupported.com/gallery", check_dns=False)
         assert exc_info.value.code == ProtocolErrorCode.UNSUPPORTED_URL
+

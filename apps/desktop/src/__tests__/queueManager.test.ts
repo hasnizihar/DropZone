@@ -259,4 +259,130 @@ describe('QueueManager State Machine & Concurrency Scheduler', () => {
     expect(child1.status).toBe('cancelled');
     expect(child2.status).toBe('cancelled');
   });
+
+  it('schedules playlist parent-child container without consuming slots', () => {
+    const parentJob = queueManager.addJob({
+      url: 'https://youtube.com/playlist?list=PL123',
+      category: 'playlist',
+      engine: 'playlist',
+      playlistItems: [
+        { id: 'v1', index: 1, url: 'https://youtube.com/watch?v=v1', title: 'Video 1', isAvailable: true },
+        { id: 'v2', index: 2, url: 'https://youtube.com/watch?v=v2', title: 'Video 2', isAvailable: true },
+        { id: 'v3', index: 3, url: 'https://youtube.com/watch?v=v3', title: 'Video 3', isAvailable: true },
+      ],
+    });
+
+    expect(parentJob.engine).toBe('playlist');
+    expect(parentJob.assetCount).toBe(3);
+    expect(parentJob.childJobIds).toHaveLength(3);
+
+    const c1 = queueManager.getJob(parentJob.childJobIds![0])!;
+    const c2 = queueManager.getJob(parentJob.childJobIds![1])!;
+    const c3 = queueManager.getJob(parentJob.childJobIds![2])!;
+
+    // maxConcurrent = 2:
+    expect(c1.status).toBe('downloading');
+    expect(c2.status).toBe('downloading');
+    expect(c3.status).toBe('pending');
+  });
+
+  it('handles partial failures and partial retry for batch containers', async () => {
+    const parentJob = queueManager.addJob({
+      url: 'batch://queue',
+      category: 'batch',
+      engine: 'batch',
+      batchItems: [
+        { url: 'https://example.com/item1.mp4', customFilename: 'item1.mp4' },
+        { url: 'https://example.com/item2.mp4', customFilename: 'item2.mp4' },
+      ],
+    });
+
+    const c1 = queueManager.getJob(parentJob.childJobIds![0])!;
+    const c2 = queueManager.getJob(parentJob.childJobIds![1])!;
+
+    // Child 1 completes
+    mockWorkerManager.emit('download-completed', {
+      jobId: c1.id,
+      outputPath: 'C:/Downloads/item1.mp4',
+      totalBytes: 5000,
+    });
+
+    // Child 2 fails
+    mockWorkerManager.emit('download-failed', {
+      jobId: c2.id,
+      code: 'HTTP_404',
+      message: 'Not found',
+    });
+
+    expect(c1.status).toBe('completed');
+    expect(c2.status).toBe('failed');
+    expect(parentJob.status).toBe('failed');
+    expect(parentJob.isPartialFailure).toBe(true);
+    expect(parentJob.error?.code).toBe('PARTIAL_FAILURE');
+
+    // Partial retry: Retry parent -> only failed child 2 should be reset to pending! Child 1 stays completed!
+    await queueManager.retryJob(parentJob.id);
+
+    expect(c1.status).toBe('completed');
+    expect(c2.status).toBe('downloading'); // Slot is available so it immediately starts downloading
+    expect(parentJob.status).toBe('downloading');
+    expect(parentJob.error).toBeUndefined();
+
+    // Now Child 2 completes
+    mockWorkerManager.emit('download-completed', {
+      jobId: c2.id,
+      outputPath: 'C:/Downloads/item2.mp4',
+      totalBytes: 5000,
+    });
+
+    expect(c2.status).toBe('completed');
+    expect(parentJob.status).toBe('completed');
+    expect(parentJob.progress).toBe(100);
+  });
+
+  it('resolves filename collisions deterministically in batch enqueuing', () => {
+    const parentJob = queueManager.addJob({
+      url: 'batch://queue',
+      category: 'batch',
+      engine: 'batch',
+      batchItems: [
+        { url: 'https://example.com/a/track.mp3', customFilename: 'track.mp3' },
+        { url: 'https://example.com/b/track.mp3', customFilename: 'track.mp3' },
+        { url: 'https://example.com/c/track.mp3', customFilename: 'track.mp3' },
+      ],
+    });
+
+    const c1 = queueManager.getJob(parentJob.childJobIds![0])!;
+    const c2 = queueManager.getJob(parentJob.childJobIds![1])!;
+    const c3 = queueManager.getJob(parentJob.childJobIds![2])!;
+
+    expect(c1.customFilename).toBe('track.mp3');
+    expect(c2.customFilename).toBe('track (1).mp3');
+    expect(c3.customFilename).toBe('track (2).mp3');
+  });
+
+  it('cascades removal of parent container job to clean up all children', async () => {
+    const parentJob = queueManager.addJob({
+      url: 'https://youtube.com/playlist?list=PL_del',
+      category: 'playlist',
+      engine: 'playlist',
+      playlistItems: [
+        { id: 'v1', index: 1, url: 'https://youtube.com/watch?v=v1', title: 'Video 1', isAvailable: true },
+        { id: 'v2', index: 2, url: 'https://youtube.com/watch?v=v2', title: 'Video 2', isAvailable: true },
+      ],
+    });
+
+    const c1Id = parentJob.childJobIds![0];
+    const c2Id = parentJob.childJobIds![1];
+
+    expect(queueManager.getJob(parentJob.id)).toBeDefined();
+    expect(queueManager.getJob(c1Id)).toBeDefined();
+    expect(queueManager.getJob(c2Id)).toBeDefined();
+
+    await queueManager.removeJob(parentJob.id);
+
+    expect(queueManager.getJob(parentJob.id)).toBeUndefined();
+    expect(queueManager.getJob(c1Id)).toBeUndefined();
+    expect(queueManager.getJob(c2Id)).toBeUndefined();
+  });
 });

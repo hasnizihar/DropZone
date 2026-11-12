@@ -50,8 +50,11 @@ export const AnalyzerPage: React.FC = () => {
   const analyzedMedia = useAppStore((state) => state.analyzedMedia);
   const analyzedFile = useAppStore((state) => state.analyzedFile);
   const analyzedGallery = useAppStore((state) => state.analyzedGallery);
+  const analyzedPlaylist = useAppStore((state) => state.analyzedPlaylist);
   const toggleGalleryAssetSelected = useAppStore((state) => state.toggleGalleryAssetSelected);
   const selectAllGalleryAssets = useAppStore((state) => state.selectAllGalleryAssets);
+  const togglePlaylistItem = useAppStore((state) => state.togglePlaylistItem);
+  const selectAllPlaylistItems = useAppStore((state) => state.selectAllPlaylistItems);
   const analysisStatus = useAppStore((state) => state.analysisStatus);
   const selectedFormatId = useAppStore((state) => state.selectedFormatId);
   const setSelectedFormatId = useAppStore((state) => state.setSelectedFormatId);
@@ -100,6 +103,28 @@ export const AnalyzerPage: React.FC = () => {
 
   const handleStartDownload = async (action: 'start' | 'queue') => {
     if (!analyzedMedia) return;
+
+    // Playlist download
+    if (analyzedPlaylist && analyzedPlaylist.entries.length > 0) {
+      const selectedEntries = analyzedPlaylist.entries.filter((e) => e.selected && e.isAvailable);
+      if (selectedEntries.length === 0) {
+        showToast('Please select at least one available video from the playlist.', 'error');
+        return;
+      }
+      const ok = await addJob({
+        url: analyzedMedia.url,
+        customFilename: customFilename.trim() || analyzedPlaylist.title,
+        targetDirectory: targetDir || settings.defaultDownloadDir,
+        category: 'playlist',
+        engine: 'playlist',
+        playlistItems: selectedEntries,
+      });
+      if (ok) {
+        showToast(action === 'start' ? 'Playlist download started!' : 'Playlist added to download queue', 'success');
+        setActiveTab('downloads');
+      }
+      return;
+    }
 
     // Gallery download
     if (analyzedGallery && analyzedGallery.assets.length > 0) {
@@ -166,9 +191,10 @@ export const AnalyzerPage: React.FC = () => {
   const selectedFormat = allFormats.find((f) => f.formatId === selectedFormatId) || allFormats[0];
   const metadata = analyzedMedia?.metadata;
 
-  const isGalleryType = Boolean(analyzedGallery || analyzedMedia?.engine === 'image-gallery');
-  const isDirectFileType = Boolean(analyzedFile || (analyzedMedia?.engine === 'direct-http' && analyzedMedia?.category !== 'image'));
-  const isDirectImageType = Boolean(!analyzedGallery && (analyzedMedia?.category === 'image' || analyzedFile?.category === 'image'));
+  const isPlaylistType = Boolean(analyzedPlaylist || analyzedMedia?.engine === 'playlist' || analyzedMedia?.category === 'playlist');
+  const isGalleryType = Boolean(!isPlaylistType && (analyzedGallery || analyzedMedia?.engine === 'image-gallery'));
+  const isDirectFileType = Boolean(!isPlaylistType && !isGalleryType && (analyzedFile || (analyzedMedia?.engine === 'direct-http' && analyzedMedia?.category !== 'image')));
+  const isDirectImageType = Boolean(!isPlaylistType && !analyzedGallery && (analyzedMedia?.category === 'image' || analyzedFile?.category === 'image'));
 
   return (
     <div className="p-8 space-y-6 max-w-6xl mx-auto">
@@ -274,7 +300,7 @@ export const AnalyzerPage: React.FC = () => {
               <div className="flex flex-wrap items-center gap-2">
                 {/* Primary Type Badge */}
                 <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded bg-brand-lime text-brand-black font-extrabold shadow-sm">
-                  {isGalleryType ? 'GALLERY' : isDirectImageType ? 'IMAGE' : isDirectFileType ? 'FILE' : 'MEDIA'}
+                  {isPlaylistType ? 'PLAYLIST' : isGalleryType ? 'GALLERY' : isDirectImageType ? 'IMAGE' : isDirectFileType ? 'FILE' : 'MEDIA'}
                 </span>
 
                 <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded bg-brand-lime/10 text-brand-lime border border-brand-lime/20 font-bold">
@@ -396,8 +422,110 @@ export const AnalyzerPage: React.FC = () => {
             </div>
           )}
 
+          {/* PLAYLIST CONTENT: Multi-Item Table with Selection Controls */}
+          {isPlaylistType && analyzedPlaylist && (
+            <div className="border-t border-brand-border pt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-brand-white flex items-center space-x-2">
+                    <Layers className="w-4 h-4 text-brand-lime" />
+                    <span>Playlist Items ({analyzedPlaylist.entries.length} loaded{analyzedPlaylist.totalCount > analyzedPlaylist.entries.length ? ` of ${analyzedPlaylist.totalCount}` : ''})</span>
+                  </h4>
+                  <p className="text-xs text-brand-grey mt-0.5">
+                    Select videos to download through the unified queue.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => selectAllPlaylistItems(true)}
+                    className="px-2.5 py-1 text-xs bg-brand-black border border-brand-border rounded text-brand-lime hover:text-brand-white transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectAllPlaylistItems(false)}
+                    className="px-2.5 py-1 text-xs bg-brand-black border border-brand-border rounded text-brand-grey hover:text-brand-white transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+
+              {/* Truncation Warning */}
+              {analyzedPlaylist.isTruncated && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-300 flex items-center space-x-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+                  <span>
+                    Playlist bounded: Loaded first {analyzedPlaylist.extractedCount} of {analyzedPlaylist.totalCount} items to protect system resources.
+                  </span>
+                </div>
+              )}
+
+              {/* Entries list */}
+              <div className="max-h-96 overflow-y-auto space-y-2 pr-1 divide-y divide-brand-border/40">
+                {analyzedPlaylist.entries.map((entry, idx) => {
+                  const isSelected = entry.selected && entry.isAvailable;
+                  return (
+                    <div
+                      key={entry.id}
+                      onClick={() => entry.isAvailable && togglePlaylistItem(idx)}
+                      className={`pt-2 flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${
+                        !entry.isAvailable
+                          ? 'opacity-40 cursor-not-allowed bg-brand-black/20'
+                          : isSelected
+                          ? 'bg-brand-lime/5 border border-brand-lime/30'
+                          : 'hover:bg-brand-black/40 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3 min-w-0 pr-4">
+                        <div className="flex-shrink-0 text-xs font-mono text-brand-grey w-6 text-right">
+                          #{entry.index}
+                        </div>
+                        {entry.thumbnail ? (
+                          <img
+                            src={entry.thumbnail}
+                            alt=""
+                            className="w-16 h-10 object-cover rounded border border-brand-border bg-brand-black flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-16 h-10 bg-brand-black rounded border border-brand-border flex items-center justify-center text-brand-grey flex-shrink-0">
+                            <Video className="w-4 h-4 opacity-40 text-brand-lime" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-brand-white truncate">
+                            {entry.title}
+                          </div>
+                          <div className="flex items-center space-x-2 text-[10px] text-brand-grey">
+                            {entry.uploader && <span>{entry.uploader}</span>}
+                            {entry.durationFormatted && (
+                              <span className="font-mono text-brand-lime">{entry.durationFormatted}</span>
+                            )}
+                            {!entry.isAvailable && (
+                              <span className="text-red-400 uppercase font-mono">[Unavailable]</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0 pr-1">
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-brand-lime" />
+                        ) : (
+                          <Square className={`w-4 h-4 ${entry.isAvailable ? 'text-brand-grey' : 'text-brand-grey/40'}`} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* STREAM FORMATS (for Video / Audio yt-dlp) */}
-          {!isGalleryType && !isDirectFileType && !isDirectImageType && allFormats.length > 0 && (
+          {!isPlaylistType && !isGalleryType && !isDirectFileType && !isDirectImageType && allFormats.length > 0 && (
             <div className="border-t border-brand-border pt-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>

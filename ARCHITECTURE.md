@@ -183,3 +183,29 @@ Direct file downloads stream network bytes directly to disk in bounded 64 KB chu
 - When a user downloads a gallery, `QueueManager` adds a parent container job (`engine: 'image-gallery'`) and creates child download jobs (`engine: 'direct-http'`) for each selected asset.
 - Child jobs compete fairly within the single authoritative FIFO concurrency scheduler (`maxConcurrentDownloads: 3`).
 - Parent jobs aggregate progress, completed asset count, and cancellation/pause state across child jobs.
+
+---
+
+## 7. Playlist & Batch Processing Architecture (Milestone 6)
+
+### 7.1 Bounded Playlist Extraction
+- Uses `yt-dlp` in flat extraction mode (`extract_flat=True`, `noplaylist=False`, `playlistend=200`) without downloading media during inspection.
+- Normalizes playlist metadata (`id`, `title`, `url`, `source`, `totalCount`, `extractedCount`, `isTruncated`, `warnings`, `entries`).
+- Unavailable, deleted, or private videos are normalized with `isAvailable: false`, preventing failed download attempts.
+- Truncation warnings are surfaced when playlists exceed the inspection limit.
+
+### 7.2 Multi-URL Batch Parsing & Independent Analysis
+- Batch URLs are parsed via `batchParser.ts`, stripping surrounding prose, deduplicating URLs, and enforcing a maximum of 50 items per batch.
+- Each URL is analyzed independently through the unified inspection pipeline across media, files, images, galleries, and playlists.
+- Analysis failures on individual URLs do not abort the remaining batch items.
+
+### 7.3 Container Jobs & Partial Retry Architecture
+- Parent container jobs (`engine: 'playlist' | 'batch' | 'image-gallery'`) are excluded from download concurrency slots.
+- Child jobs compete fairly within the authoritative scheduler (`maxConcurrentDownloads: 3`).
+- Deterministic filename collisions are prevented via `resolveUniqueFilename`.
+- Parent jobs accurately reflect aggregate progress, completed item counts, and terminal states:
+  - All children completed -> `completed`.
+  - All children cancelled -> `cancelled`.
+  - Mixed completed/failed -> `failed` with `isPartialFailure: true` (`PARTIAL_FAILURE`).
+- **Partial Retry**: Retrying a parent container job resets and re-queues only failed or cancelled children, strictly preserving successful downloads.
+- Cascading cancellation and cascading removal ensure child jobs are never orphaned.

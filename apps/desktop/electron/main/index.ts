@@ -5,11 +5,12 @@ import { IPC_CHANNELS } from '../ipc/channels';
 import { getSystemEnginesReport } from './engines';
 import { WorkerManager } from '../worker/WorkerManager';
 import { QueueManager } from '../queue/QueueManager';
-import type {
+import {
   AppSettings,
   DownloadJob,
   CreateDownloadOptions,
   MediaInfo,
+  parseBatchUrls,
 } from '@dropzone/shared';
 
 let mainWindow: BrowserWindow | null = null;
@@ -191,6 +192,39 @@ function setupIpcHandlers() {
         return { success: false, error: 'Analyzer returned empty or invalid response.' };
       }
 
+      // Handle Playlist Result
+      if (response.downloadType === 'playlist' || response.isPlaylist || response.playlist) {
+        const playlistData = response.playlist || response;
+        const info: MediaInfo = {
+          url: playlistData.url || url.trim(),
+          metadata: {
+            id: playlistData.id || 'playlist',
+            title: playlistData.title || 'Media Playlist',
+            extractor: playlistData.extractor || 'Playlist',
+            platform: playlistData.source || 'Playlist',
+            originalUrl: url.trim(),
+            webpageUrl: url.trim(),
+            mediaType: 'video',
+            isPlaylist: true,
+            playlistCount: playlistData.totalCount || playlistData.extractedCount,
+          },
+          formats: [],
+          extractor: {
+            name: playlistData.source || 'Playlist',
+            key: playlistData.extractor || 'playlist',
+          },
+          analysisDurationMs: 0,
+          title: playlistData.title || 'Media Playlist',
+          thumbnail: playlistData.entries?.[0]?.thumbnail,
+          source: playlistData.source || 'Playlist',
+          category: 'playlist',
+          engine: 'playlist',
+          isPlaylist: true,
+          playlistItemsCount: playlistData.totalCount || playlistData.extractedCount,
+        };
+        return { success: true, data: info, playlist: playlistData };
+      }
+
       // Handle Gallery Result
       if (response.downloadType === 'gallery' || response.isGallery) {
         const info: MediaInfo = {
@@ -362,72 +396,68 @@ function setupIpcHandlers() {
     return { success: true, count };
   });
 
+  // Playlist Inspector
+  ipcMain.handle(IPC_CHANNELS.PLAYLIST_INSPECT, async (_event, url: string, maxEntries?: number) => {
+    if (!url || typeof url !== 'string' || !url.trim().startsWith('http')) {
+      return { success: false, error: 'Please enter a valid HTTP or HTTPS playlist URL.' };
+    }
+    try {
+      if (!workerManager.getStatusInfo().isAlive) {
+        await workerManager.start();
+      }
+      const playlist = await workerManager.inspectPlaylist(url.trim(), maxEntries);
+      return { success: true, data: playlist };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Failed to inspect playlist.' };
+    }
+  });
+
   // Batch
-  ipcMain.handle(IPC_CHANNELS.BATCH_INSPECT_MULTIPLE, async (_event, urls: string[]) => {
-    const results: MediaInfo[] = [];
-    const errors: { url: string; error: string }[] = [];
+  ipcMain.handle(IPC_CHANNELS.BATCH_INSPECT_MULTIPLE, async (_event, rawUrls: string[]) => {
+    const { urls, excessCount } = parseBatchUrls(rawUrls.join('\n'), 50);
+    if (urls.length === 0) {
+      return { success: false, results: [], excessCount: 0, error: 'No valid HTTP/HTTPS URLs provided.' };
+    }
 
-    for (const rawUrl of urls) {
-      const url = rawUrl.trim();
-      if (!url) continue;
-
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        errors.push({ url, error: 'Invalid URL scheme' });
-        continue;
+    try {
+      if (!workerManager.getStatusInfo().isAlive) {
+        await workerManager.start();
       }
+      const batchRes = await workerManager.inspectBatch(urls);
+      return {
+        success: true,
+        results: batchRes.results,
+        excessCount,
+        errorsCount: batchRes.errorsCount,
+      };
+    } catch (err: any) {
+      return { success: false, results: [], excessCount, error: err.message || 'Batch inspection failed.' };
+    }
+  });
 
-      let source = 'Direct Download';
+  ipcMain.handle(
+    IPC_CHANNELS.BATCH_START,
+    (_event, items: CreateDownloadOptions[], options?: { title?: string; targetDirectory?: string }) => {
       try {
-        source = new URL(url).hostname.replace('www.', '');
-      } catch {
-        // ignore
+        if (!items || items.length === 0) {
+          return { success: false, jobIds: [], error: 'No items provided to enqueue.' };
+        }
+        const parentJob = queueManager.addJob({
+          url: 'batch://queue',
+          customFilename: options?.title || `Batch (${items.length} items)`,
+          targetDirectory: options?.targetDirectory,
+          batchItems: items,
+        });
+        return {
+          success: true,
+          parentJobId: parentJob.id,
+          jobIds: parentJob.childJobIds || [],
+        };
+      } catch (err: any) {
+        return { success: false, jobIds: [], error: err.message };
       }
-
-      results.push({
-        url,
-        title: url.split('/').pop()?.split('?')[0] || 'Media Item',
-        source,
-        category: 'video',
-        engine: 'yt-dlp',
-        isPlaylist: false,
-        analysisDurationMs: 0,
-        extractor: { name: source, key: 'generic' },
-        metadata: {
-          id: url,
-          title: url.split('/').pop()?.split('?')[0] || 'Media Item',
-          platform: source,
-          extractor: 'generic',
-          originalUrl: url,
-          mediaType: 'video',
-          isPlaylist: false,
-        },
-        formats: [
-          {
-            formatId: 'best',
-            extension: 'mp4',
-            resolution: 'Optimal',
-            isVideo: true,
-            isAudio: true,
-            isCombined: true,
-            hasVideo: true,
-            hasAudio: true,
-            qualityLabel: 'Best Quality',
-          },
-        ],
-      });
     }
-
-    return { success: true, results, errors };
-  });
-
-  ipcMain.handle(IPC_CHANNELS.BATCH_START, (_event, items: CreateDownloadOptions[]) => {
-    const jobIds: string[] = [];
-    for (const item of items) {
-      const job = queueManager.addJob(item);
-      jobIds.push(job.id);
-    }
-    return { success: true, jobIds };
-  });
+  );
 
   // Worker Subprocess (Milestone 2)
   ipcMain.handle(IPC_CHANNELS.WORKER_START, async () => {

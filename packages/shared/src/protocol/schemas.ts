@@ -46,7 +46,7 @@ export const WorkerStatusPayloadSchema = z.object({
 export const StartDownloadRequestPayloadSchema = z.object({
   jobId: z.string().min(1),
   url: z.string().url(),
-  engine: z.enum(['yt-dlp', 'direct-http', 'image-gallery', 'image', 'ffmpeg']).optional(),
+  engine: z.enum(['yt-dlp', 'direct-http', 'image-gallery', 'playlist', 'batch', 'image', 'ffmpeg']).optional(),
   formatId: z.string().optional(),
   targetDirectory: z.string().min(1),
   customFilename: z.string().optional(),
@@ -139,6 +139,50 @@ export const PauseDownloadResponsePayloadSchema = z.object({
   jobId: z.string(),
   paused: z.boolean(),
   success: z.boolean().optional(),
+});
+
+export const PlaylistItemSchema = z.object({
+  id: z.string(),
+  index: z.number(),
+  url: z.string(),
+  title: z.string(),
+  duration: z.number().nullable().optional(),
+  durationFormatted: z.string().nullable().optional(),
+  thumbnail: z.string().nullable().optional(),
+  uploader: z.string().nullable().optional(),
+  isAvailable: z.boolean(),
+  selected: z.boolean().optional(),
+  formatId: z.string().optional(),
+});
+
+export const PlaylistInfoSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  url: z.string().url(),
+  source: z.string(),
+  extractor: z.string(),
+  totalCount: z.number(),
+  extractedCount: z.number(),
+  isTruncated: z.boolean(),
+  warnings: z.array(z.string()).optional(),
+  entries: z.array(PlaylistItemSchema),
+  downloadType: z.literal('playlist'),
+});
+
+export const BatchItemAnalysisResultSchema = z.object({
+  id: z.string(),
+  url: z.string(),
+  status: z.enum(['pending', 'analyzing', 'ready', 'unsupported', 'failed']),
+  downloadType: z.enum(['media', 'file', 'image', 'gallery', 'playlist']).optional(),
+  title: z.string().optional(),
+  source: z.string().optional(),
+  fileSizeBytes: z.number().optional(),
+  duration: z.number().optional(),
+  thumbnail: z.string().optional(),
+  error: z.string().optional(),
+  selected: z.boolean(),
+  selectedFormatId: z.string().optional(),
+  customFilename: z.string().optional(),
 });
 
 

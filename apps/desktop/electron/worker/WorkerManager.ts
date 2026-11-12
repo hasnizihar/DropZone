@@ -23,6 +23,8 @@ import {
   PauseDownloadResponsePayload,
   DirectFileInfo,
   GalleryInfo,
+  PlaylistInfo,
+  BatchItemAnalysisResult,
 } from '@dropzone/shared';
 
 interface PendingRequest {
@@ -181,6 +183,25 @@ export class WorkerManager extends EventEmitter {
     return this.sendRequest<GalleryInfo>(
       WORKER_COMMANDS.INSPECT_GALLERY,
       { url },
+      timeoutMs
+    );
+  }
+
+  public async inspectPlaylist(url: string, maxEntries?: number, timeoutMs = 45000): Promise<PlaylistInfo> {
+    return this.sendRequest<PlaylistInfo>(
+      WORKER_COMMANDS.INSPECT_PLAYLIST,
+      { url, maxEntries },
+      timeoutMs
+    );
+  }
+
+  public async inspectBatch(
+    urls: string[],
+    timeoutMs = 60000
+  ): Promise<{ success: boolean; results: BatchItemAnalysisResult[]; errorsCount: number }> {
+    return this.sendRequest(
+      WORKER_COMMANDS.INSPECT_BATCH,
+      { urls },
       timeoutMs
     );
   }

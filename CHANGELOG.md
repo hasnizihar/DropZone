@@ -2,6 +2,19 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.6] - 2026-11-12
+
+### Added
+- **Dedicated Bounded Playlist Inspection**: Implemented `PlaylistService` using `yt-dlp` with `extract_flat=True` and bounded extraction (`playlistend: 200`) without downloading media, normalizing entries, handling deleted/private items, and reporting truncation warnings.
+- **Multi-URL Batch Ingestion & Parsing**: Added `batchParser.ts` for text paste and `.txt`/`.csv` file imports, robustly extracting URLs from mixed prose, commas, and newlines, deduplicating, and bounding to 50 URLs with excess count notifications.
+- **Independent Parallel Batch Analysis**: Added `BATCH_INSPECT_MULTIPLE` workflow analyzing mixed media, file, image, gallery, and playlist URLs in parallel with individual statuses (`pending`, `analyzing`, `ready`, `unsupported`, `failed`).
+- **Parent-Child Container Queue Architecture**: Extended `QueueManager` with non-blocking container jobs (`'playlist'`, `'batch'`) that manage child downloads without occupying concurrency slots (`maxConcurrentDownloads: 3`).
+- **Deterministic Collision Resolution**: Implemented `resolveUniqueFilename` preventing file overwrite collisions across multi-item batch and playlist downloads.
+- **Partial Failure & Partial Retry**: Added comprehensive partial failure tracking (`isPartialFailure: true`) where retrying a parent job re-queues only failed/cancelled children while preserving completed downloads.
+- **Cascading Lifecycle Controls**: Cascading cancellation and removal for playlist and batch container jobs, ensuring clean resource cleanup with zero orphaned tasks.
+- **Batch & Playlist UI**: Overhauled `BatchPage` with import dropzone/paste area, live item counters, mixed-type badges, per-item retry/remove controls, and destination folder selector; updated `AnalyzerPage` with playlist entry selection table; added playlist/batch badges to `DownloadsPage`.
+- **Comprehensive Test Suite**: Added 4 new Pytest tests (45 total) and 12 new Vitest tests (49 total across 9 test files) verifying playlist parsing, bounded inspection, batch URL extraction, queue scheduling, partial retry, and UI rendering.
+
 ## [1.0.0-alpha.5] - 2026-11-12
 
 ### Added
@@ -15,6 +28,8 @@ All notable changes to the DROPZONE project will be documented in this file.
 - **QueueManager Gallery Integration**: Seamless parent-child job architecture for multi-asset galleries; child jobs execute independently within the authoritative FIFO concurrency scheduler (`maxConcurrentDownloads: 3`).
 - **UI & Discovery Enhancements**: Updated `AnalyzerPage` with distinct `MEDIA`, `FILE`, `IMAGE`, `GALLERY` badges, resumability indicators, image asset grid with select/deselect controls, and updated `DownloadsPage` with live Resume controls.
 - **Comprehensive Test Suite**: Added 15 new Python tests (41 total) and 3 new Vitest tests (37 total) covering chunked streaming, range resumption, pause/cancellation, SSRF defenses, and gallery scheduling.
+
+## [1.0.0-alpha.4] - 2026-11-12
 
 ### Added
 - **Core Downloads Execution Engine**: Implemented `DownloadService` in Python worker powered by `yt-dlp` in execution mode (`download=True`) with audio extraction post-processing (`FFmpegExtractAudio`).

@@ -47,6 +47,12 @@ export const DownloadsPage: React.FC = () => {
   });
 
   const getJobBadge = (job: typeof jobs[0]) => {
+    if (job.engine === 'playlist' || job.category === 'playlist') {
+      return { label: 'PLAYLIST', color: 'bg-amber-500/20 text-amber-400 border-amber-500/30' };
+    }
+    if (job.engine === 'batch' || job.category === 'batch') {
+      return { label: 'BATCH', color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' };
+    }
     if (job.engine === 'image-gallery') {
       return { label: 'GALLERY', color: 'bg-brand-lime text-brand-black' };
     }
@@ -148,6 +154,12 @@ export const DownloadsPage: React.FC = () => {
                       {job.assetCount !== undefined && job.assetCount > 0 && (
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-brand-lime/10 text-brand-lime border border-brand-lime/20 font-bold">
                           {job.completedAssetsCount || 0} / {job.assetCount} assets
+                        </span>
+                      )}
+
+                      {job.isPartialFailure && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold">
+                          Partial Failure
                         </span>
                       )}
                     </div>

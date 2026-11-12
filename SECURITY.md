@@ -40,3 +40,11 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - HTTP redirects are bounded (max 5 hops) and every intermediate location header is validated against SSRF rules; protocol downgrades (HTTPS -> HTTP) are strictly blocked.
    - Filenames are protected against Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) and path traversal sequences.
    - Range-based download resumption requires remote resource validation (ETag / Last-Modified sidecar checks) to prevent silent data corruption.
+
+7. **Batch & Playlist Security (Milestone 6)**
+   - Batch URL ingestion is strictly bounded to a maximum of 50 URLs per operation, preventing memory exhaustion and runaway network requests.
+   - Prose containing URLs is stripped of surrounding punctuation and non-HTTP tokens; freeform text is never evaluated into arbitrary commands or shell calls.
+   - Every batch URL is independently validated through SSRF and DNS rebinding protections; batch mode never weakens URL security filters.
+   - Playlist inspection is bounded (default max 200 items, `playlistend`) in flat non-downloading mode, preventing memory exhaustion and infinite-stream denial of service.
+   - Private and restricted content is detected and marked unavailable without attempting authentication bypass or access control defeats.
+   - Filename collision handling enforces deterministic unique names (`resolveUniqueFilename`), guaranteeing that multiple URLs in the same directory never overwrite completed files without explicit authorization.

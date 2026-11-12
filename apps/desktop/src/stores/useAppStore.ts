@@ -4,6 +4,8 @@ import type {
   MediaInfo,
   DirectFileInfo,
   GalleryInfo,
+  PlaylistInfo,
+  BatchItemAnalysisResult,
   AppSettings,
   SystemEnginesReport,
   CreateDownloadOptions,
@@ -32,6 +34,9 @@ interface AppState {
   analyzedMedia: MediaInfo | null;
   analyzedFile: DirectFileInfo | null;
   analyzedGallery: GalleryInfo | null;
+  analyzedPlaylist: PlaylistInfo | null;
+  batchItems: BatchItemAnalysisResult[];
+  isAnalyzingBatch: boolean;
   analysisStatus: AnalysisStatus;
   selectedFormatId: string | null;
   isAnalyzing: boolean;
@@ -49,12 +54,22 @@ interface AppState {
   resetAnalysis: () => void;
   toggleGalleryAssetSelected: (index: number) => void;
   selectAllGalleryAssets: (selected: boolean) => void;
+  togglePlaylistItem: (index: number) => void;
+  selectAllPlaylistItems: (selected: boolean) => void;
+  setBatchItems: (items: BatchItemAnalysisResult[]) => void;
+  updateBatchItem: (id: string, updates: Partial<BatchItemAnalysisResult>) => void;
+  toggleBatchItem: (id: string) => void;
+  selectAllBatchItems: (selected: boolean) => void;
+  removeBatchItem: (id: string) => void;
   showToast: (text: string, type?: 'info' | 'success' | 'error') => void;
   clearToast: () => void;
   
   // Async IPC Actions
   init: () => Promise<void>;
   inspectUrl: (url: string) => Promise<boolean>;
+  inspectPlaylist: (url: string, maxEntries?: number) => Promise<boolean>;
+  inspectBatch: (urls: string[]) => Promise<void>;
+  startBatch: (options?: { targetDirectory?: string; title?: string }) => Promise<boolean>;
   addJob: (options: CreateDownloadOptions) => Promise<boolean>;
   pauseJob: (jobId: string) => Promise<void>;
   resumeJob: (jobId: string) => Promise<void>;
@@ -79,6 +94,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   analyzedMedia: null,
   analyzedFile: null,
   analyzedGallery: null,
+  analyzedPlaylist: null,
+  batchItems: [],
+  isAnalyzingBatch: false,
   analysisStatus: 'idle',
   selectedFormatId: null,
   isAnalyzing: false,
@@ -108,6 +126,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       analyzedMedia: null,
       analyzedFile: null,
       analyzedGallery: null,
+      analyzedPlaylist: null,
       selectedFormatId: null,
       isAnalyzing: false,
       analysisStatus: 'idle',
@@ -142,6 +161,62 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     });
   },
+
+  togglePlaylistItem: (index: number) => {
+    set((state) => {
+      if (!state.analyzedPlaylist) return state;
+      const updatedEntries = state.analyzedPlaylist.entries.map((e, i) =>
+        i === index ? { ...e, selected: !e.selected } : e
+      );
+      return {
+        analyzedPlaylist: {
+          ...state.analyzedPlaylist,
+          entries: updatedEntries,
+        },
+      };
+    });
+  },
+
+  selectAllPlaylistItems: (selected: boolean) => {
+    set((state) => {
+      if (!state.analyzedPlaylist) return state;
+      const updatedEntries = state.analyzedPlaylist.entries.map((e) =>
+        e.isAvailable ? { ...e, selected } : e
+      );
+      return {
+        analyzedPlaylist: {
+          ...state.analyzedPlaylist,
+          entries: updatedEntries,
+        },
+      };
+    });
+  },
+
+  setBatchItems: (batchItems) => set({ batchItems }),
+
+  updateBatchItem: (id, updates) =>
+    set((state) => ({
+      batchItems: state.batchItems.map((item) => (item.id === id ? { ...item, ...updates } : item)),
+    })),
+
+  toggleBatchItem: (id) =>
+    set((state) => ({
+      batchItems: state.batchItems.map((item) =>
+        item.id === id ? { ...item, selected: !item.selected } : item
+      ),
+    })),
+
+  selectAllBatchItems: (selected) =>
+    set((state) => ({
+      batchItems: state.batchItems.map((item) =>
+        item.status === 'ready' ? { ...item, selected } : item
+      ),
+    })),
+
+  removeBatchItem: (id) =>
+    set((state) => ({
+      batchItems: state.batchItems.filter((item) => item.id !== id),
+    })),
 
   showToast: (text, type = 'info') => {
     const id = Date.now().toString();
@@ -283,6 +358,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             analyzedMedia: res.data,
             analyzedFile: res.fileInfo || null,
             analyzedGallery: res.gallery || null,
+            analyzedPlaylist: res.playlist || null,
             selectedFormatId: defaultFmt?.formatId || null,
             isAnalyzing: false,
             analysisStatus: 'completed',
@@ -312,6 +388,111 @@ export const useAppStore = create<AppState>((set, get) => ({
         analyzeError: errMsg,
       });
       get().showToast(errMsg, 'error');
+      return false;
+    }
+  },
+
+  inspectPlaylist: async (url: string, maxEntries?: number) => {
+    const trimmed = url.trim();
+    if (!trimmed) {
+      set({ analyzeError: 'Please enter a playlist URL.', analysisStatus: 'failed' });
+      return false;
+    }
+    set({ isAnalyzing: true, analysisStatus: 'analyzing', analyzeError: null });
+
+    try {
+      if (typeof window !== 'undefined' && window.dropzone) {
+        const res = await window.dropzone.inspectPlaylist(trimmed, maxEntries);
+        if (res.success && res.data) {
+          set({
+            analyzedPlaylist: res.data,
+            isAnalyzing: false,
+            analysisStatus: 'completed',
+            analyzeError: null,
+          });
+          return true;
+        } else {
+          const err = res.error || 'Failed to inspect playlist';
+          set({ isAnalyzing: false, analysisStatus: 'failed', analyzeError: err });
+          get().showToast(err, 'error');
+          return false;
+        }
+      }
+      return false;
+    } catch (err: any) {
+      const errStr = err?.message || 'Playlist inspection failed';
+      set({ isAnalyzing: false, analysisStatus: 'failed', analyzeError: errStr });
+      get().showToast(errStr, 'error');
+      return false;
+    }
+  },
+
+  inspectBatch: async (urls: string[]) => {
+    if (!urls || urls.length === 0) return;
+    set({ isAnalyzingBatch: true });
+
+    try {
+      if (typeof window !== 'undefined' && window.dropzone) {
+        const res = await window.dropzone.inspectBatch(urls);
+        if (res.success && res.results) {
+          set({ batchItems: res.results, isAnalyzingBatch: false });
+          if (res.excessCount && res.excessCount > 0) {
+            get().showToast(`Batch bounded to 50 URLs (${res.excessCount} excess URLs omitted)`, 'info');
+          } else {
+            get().showToast(`Inspected ${res.results.length} URLs in batch`, 'success');
+          }
+        } else {
+          set({ isAnalyzingBatch: false });
+          get().showToast(res.error || 'Batch inspection failed', 'error');
+        }
+      }
+    } catch (err: any) {
+      set({ isAnalyzingBatch: false });
+      get().showToast(err?.message || 'Failed to analyze batch', 'error');
+    }
+  },
+
+  startBatch: async (options?: { targetDirectory?: string; title?: string }) => {
+    const { batchItems, settings } = get();
+    const readySelected = batchItems.filter((i) => i.selected && i.status === 'ready');
+    if (readySelected.length === 0) {
+      get().showToast('No ready and selected items to enqueue.', 'error');
+      return false;
+    }
+
+    const targetDir = options?.targetDirectory || settings.defaultDownloadDir;
+    const downloadOptionsList: CreateDownloadOptions[] = readySelected.map((item) => {
+      const isImage = item.downloadType === 'image';
+      const isFile = item.downloadType === 'file';
+      const engine = isImage || isFile ? 'direct-http' : 'yt-dlp';
+      return {
+        url: item.url,
+        customFilename: item.customFilename || item.title,
+        targetDirectory: targetDir,
+        engine,
+        category: isImage ? 'image' : (isFile ? 'file' : 'video'),
+        selectedFormatId: item.selectedFormatId || 'best',
+      };
+    });
+
+    try {
+      if (typeof window !== 'undefined' && window.dropzone) {
+        const res = await window.dropzone.startBatch(downloadOptionsList, {
+          title: options?.title || `Batch (${readySelected.length} items)`,
+          targetDirectory: targetDir,
+        });
+        if (res.success) {
+          get().showToast(`Enqueued batch container with ${readySelected.length} items`, 'success');
+          set({ activeTab: 'downloads' });
+          return true;
+        } else {
+          get().showToast(res.error || 'Failed to start batch downloads', 'error');
+          return false;
+        }
+      }
+      return false;
+    } catch (err: any) {
+      get().showToast(err?.message || 'Failed to start batch', 'error');
       return false;
     }
   },

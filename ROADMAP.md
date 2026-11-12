@@ -10,7 +10,7 @@
 - [x] Download Queue State Machine & Scheduler (Milestone 4)
 - [x] Direct HTTP/HTTPS Chunked Downloader with Resume (Milestone 5)
 - [x] Image & Gallery Extraction (Milestone 5)
-- [ ] Batch & Playlist Processing (Milestone 6)
+- [x] Batch & Playlist Processing (Milestone 6)
 - [ ] FFmpeg Stream Merging & Audio Conversion (Milestone 7)
 - [ ] Settings Persistence & History Management (Milestone 8)
 - [ ] End-to-End Testing & Crash Recovery Hardening (Milestone 9)

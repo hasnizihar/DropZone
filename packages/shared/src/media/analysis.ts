@@ -31,8 +31,10 @@ export interface AnalyzeUrlResponsePayload {
   formats?: MediaFormat[];
   extractor?: ExtractorInfo;
   analysisDurationMs?: number;
-  downloadType?: 'media' | 'file' | 'image' | 'gallery';
+  downloadType?: 'media' | 'file' | 'image' | 'gallery' | 'playlist';
   isGallery?: boolean;
+  isPlaylist?: boolean;
+  playlist?: any;
   title?: string;
   url?: string;
   source?: string;

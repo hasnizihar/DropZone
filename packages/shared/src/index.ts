@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export * from './protocol';
 export * from './media';
+export * from './utils/batchParser';
 
 import type { MediaMetadata } from './media/metadata';
 import type { MediaFormat } from './media/formats';
@@ -60,6 +61,8 @@ export type DownloadEngineType =
   | 'yt-dlp'
   | 'direct-http'
   | 'image-gallery'
+  | 'playlist'
+  | 'batch'
   | 'ffmpeg';
 
 // ==========================================
@@ -72,6 +75,51 @@ export interface PlaylistItemInfo {
   title: string;
   duration?: number;
   thumbnail?: string;
+}
+
+export interface PlaylistItem {
+  id: string;
+  index: number;
+  url: string;
+  title: string;
+  duration?: number;
+  durationFormatted?: string;
+  thumbnail?: string;
+  uploader?: string;
+  isAvailable: boolean;
+  selected?: boolean;
+  formatId?: string;
+}
+
+export interface PlaylistInfo {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  extractor: string;
+  totalCount: number;
+  extractedCount: number;
+  isTruncated: boolean;
+  warnings?: string[];
+  entries: PlaylistItem[];
+  downloadType: 'playlist';
+}
+
+export interface BatchItemAnalysisResult {
+  id: string;
+  url: string;
+  status: 'pending' | 'analyzing' | 'ready' | 'unsupported' | 'failed';
+  downloadType?: 'media' | 'file' | 'image' | 'gallery' | 'playlist';
+  title?: string;
+  source?: string;
+  fileSizeBytes?: number;
+  duration?: number;
+  thumbnail?: string;
+  error?: string;
+  selected: boolean;
+  selectedFormatId?: string;
+  customFilename?: string;
+  analysisResult?: UnifiedAnalysisResult;
 }
 
 export interface MediaInfo {
@@ -132,10 +180,11 @@ export interface DirectFileInfo {
 export interface UnifiedAnalysisResult {
   url: string;
   title?: string;
-  downloadType: 'media' | 'file' | 'image' | 'gallery';
+  downloadType: 'media' | 'file' | 'image' | 'gallery' | 'playlist';
   media?: MediaInfo;
   fileInfo?: DirectFileInfo;
   gallery?: GalleryInfo;
+  playlist?: PlaylistInfo;
   assets?: GalleryAsset[];
 }
 
@@ -164,6 +213,9 @@ export interface DownloadJob {
   childJobIds?: string[];
   assetCount?: number;
   completedAssetsCount?: number;
+  failedAssetsCount?: number;
+  cancelledAssetsCount?: number;
+  isPartialFailure?: boolean;
   mimeType?: string;
   supportsResume?: boolean;
   error?: {
@@ -187,6 +239,8 @@ export interface CreateDownloadOptions {
   audioFormat?: 'mp3' | 'm4a' | 'wav' | 'flac';
   parentJobId?: string;
   assets?: GalleryAsset[];
+  playlistItems?: PlaylistItem[];
+  batchItems?: CreateDownloadOptions[];
 }
 
 // ==========================================
@@ -248,9 +302,17 @@ export interface IpcRendererToMainApi {
     data?: MediaInfo;
     fileInfo?: DirectFileInfo;
     gallery?: GalleryInfo;
+    playlist?: PlaylistInfo;
     error?: string;
   }>;
   
+  // Playlist
+  inspectPlaylist(url: string, maxEntries?: number): Promise<{
+    success: boolean;
+    data?: PlaylistInfo;
+    error?: string;
+  }>;
+
   // Job Management
   addJob(options: CreateDownloadOptions): Promise<{ success: boolean; job?: DownloadJob; error?: string }>;
   pauseJob(jobId: string): Promise<{ success: boolean; error?: string }>;
@@ -262,8 +324,21 @@ export interface IpcRendererToMainApi {
   getAllJobs(): Promise<DownloadJob[]>;
   
   // Batch
-  inspectBatch(urls: string[]): Promise<{ success: boolean; results: MediaInfo[]; errors: { url: string; error: string }[] }>;
-  startBatch(items: CreateDownloadOptions[]): Promise<{ success: boolean; jobIds: string[] }>;
+  inspectBatch(urls: string[]): Promise<{
+    success: boolean;
+    results: BatchItemAnalysisResult[];
+    excessCount?: number;
+    error?: string;
+  }>;
+  startBatch(
+    items: CreateDownloadOptions[],
+    options?: { title?: string; targetDirectory?: string }
+  ): Promise<{
+    success: boolean;
+    jobIds: string[];
+    parentJobId?: string;
+    error?: string;
+  }>;
 
   // System & Environment
   getSystemInfo(): Promise<{ version: string; platform: string; engines: SystemEnginesReport }>;

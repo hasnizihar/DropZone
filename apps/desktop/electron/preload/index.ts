@@ -10,6 +10,7 @@ import type {
 const dropzoneApi = {
   // Analyzer
   inspectUrl: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.ANALYZER_INSPECT, url),
+  inspectPlaylist: (url: string, maxEntries?: number) => ipcRenderer.invoke(IPC_CHANNELS.PLAYLIST_INSPECT, url, maxEntries),
 
   // Job Management
   addJob: (options: CreateDownloadOptions) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_ADD, options),
@@ -23,7 +24,8 @@ const dropzoneApi = {
 
   // Batch
   inspectBatch: (urls: string[]) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_INSPECT_MULTIPLE, urls),
-  startBatch: (items: CreateDownloadOptions[]) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_START, items),
+  startBatch: (items: CreateDownloadOptions[], options?: { title?: string; targetDirectory?: string }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.BATCH_START, items, options),
 
   // System & Environment
   getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_INFO),

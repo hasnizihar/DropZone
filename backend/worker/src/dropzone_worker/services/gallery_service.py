@@ -176,3 +176,4 @@ class GalleryService:
             "assetCount": len(assets),
             "assets": assets,
         }
+

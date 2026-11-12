@@ -1,6 +1,7 @@
 export const IPC_CHANNELS = {
   // Analyzer
   ANALYZER_INSPECT: 'analyzer:inspect',
+  PLAYLIST_INSPECT: 'playlist:inspect',
 
   // Downloads
   DOWNLOADS_ADD: 'downloads:add',

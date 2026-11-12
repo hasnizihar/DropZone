@@ -20,6 +20,7 @@ from ..services.download_service import DownloadService
 from ..services.direct_http_service import DirectHttpService
 from ..services.direct_stream_engine import DirectStreamEngine
 from ..services.gallery_service import GalleryService
+from ..services.playlist_service import PlaylistService
 
 logger = logging.getLogger("dropzone_worker")
 
@@ -33,6 +34,7 @@ class CommandDispatcher:
         http_service: Optional[DirectHttpService] = None,
         direct_stream_engine: Optional[DirectStreamEngine] = None,
         gallery_service: Optional[GalleryService] = None,
+        playlist_service: Optional[PlaylistService] = None,
         write_message_fn: Optional[Callable[[ProtocolMessage], None]] = None,
         max_workers: int = 4,
     ):
@@ -47,6 +49,7 @@ class CommandDispatcher:
             http_service=self.http_service,
         )
         self.gallery_service = gallery_service or GalleryService(http_service=self.http_service)
+        self.playlist_service = playlist_service or PlaylistService()
         self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="worker_task")
 
         self._handlers = {
@@ -57,6 +60,8 @@ class CommandDispatcher:
             "analyze_url": self._handle_analyze_url,
             "inspect_direct_url": self._handle_inspect_direct_url,
             "inspect_gallery": self._handle_inspect_gallery,
+            "inspect_playlist": self._handle_inspect_playlist,
+            "inspect_batch": self._handle_inspect_batch,
             "start_download": self._handle_start_download,
             "cancel_download": self._handle_cancel_download,
             "pause_download": self._handle_pause_download,
@@ -77,7 +82,7 @@ class CommandDispatcher:
                 f"Command '{request.command}' is not supported by worker"
             )
 
-        if cmd in ("analyze_url", "inspect_gallery", "inspect_direct_url") and self.write_message_fn:
+        if cmd in ("analyze_url", "inspect_gallery", "inspect_direct_url", "inspect_playlist") and self.write_message_fn:
             self._dispatch_async_analyze(request)
             return None
 
@@ -90,7 +95,7 @@ class CommandDispatcher:
         return create_response(request.id, request.command, payload)
 
     def _analyze_unified(self, url: str) -> Dict[str, Any]:
-        """Unified inspection trying direct image, gallery, yt-dlp media, or direct file."""
+        """Unified inspection trying direct image, gallery, playlist, yt-dlp media, or direct file."""
         validate_url(url)
 
         # 1. Direct image check
@@ -111,7 +116,16 @@ class CommandDispatcher:
             except Exception:
                 pass
 
-        # 3. Media analysis with yt-dlp
+        # 3. Playlist check
+        if self.playlist_service.is_playlist_url(url):
+            try:
+                res = self.playlist_service.extract_playlist(url)
+                res["downloadType"] = "playlist"
+                return res
+            except Exception:
+                pass
+
+        # 4. Media analysis with yt-dlp
         media_error = None
         try:
             res = self.analyzer.analyze(url)
@@ -170,6 +184,12 @@ class CommandDispatcher:
                     result["downloadType"] = "file"
                 elif cmd == "inspect_gallery":
                     result = self.gallery_service.extract_gallery_or_image(url)
+                elif cmd == "inspect_playlist":
+                    result = self.playlist_service.extract_playlist(
+                        url,
+                        max_entries=request.payload.get("maxEntries"),
+                    )
+                    result["downloadType"] = "playlist"
                 else:
                     result = self._analyze_unified(url)
 
@@ -292,6 +312,8 @@ class CommandDispatcher:
                 "analyze_url",
                 "inspect_direct_url",
                 "inspect_gallery",
+                "inspect_playlist",
+                "inspect_batch",
                 "start_download",
                 "cancel_download",
                 "pause_download",
@@ -314,6 +336,8 @@ class CommandDispatcher:
             "analyze_url",
             "inspect_direct_url",
             "inspect_gallery",
+            "inspect_playlist",
+            "inspect_batch",
             "start_download",
             "cancel_download",
             "pause_download",
@@ -342,6 +366,73 @@ class CommandDispatcher:
     def _handle_inspect_gallery(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = payload.get("url")
         return self.gallery_service.extract_gallery_or_image(url)
+
+    def _handle_inspect_playlist(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = payload.get("url")
+        if not url:
+            raise WorkerProtocolError(ProtocolErrorCode.INVALID_REQUEST, "Missing 'url' parameter")
+        return self.playlist_service.extract_playlist(
+            url,
+            max_entries=payload.get("maxEntries"),
+        )
+
+    def _handle_inspect_batch(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        urls = payload.get("urls") or []
+        if not isinstance(urls, list):
+            raise WorkerProtocolError(ProtocolErrorCode.INVALID_REQUEST, "'urls' must be a list of strings")
+
+        results = []
+        for idx, u in enumerate(urls):
+            u_str = str(u).strip()
+            if not u_str:
+                continue
+            item_id = f"batch_{idx}_{abs(hash(u_str)) % 10000}"
+            try:
+                res = self._analyze_unified(u_str)
+                download_type = res.get("downloadType", "media")
+                title = res.get("title") or (res.get("metadata", {}).get("title") if isinstance(res.get("metadata"), dict) else None) or u_str.split("/")[-1]
+                source = res.get("source") or (res.get("extractor", {}).get("name") if isinstance(res.get("extractor"), dict) else None) or "Web"
+                file_size = None
+                if res.get("fileInfo") and isinstance(res["fileInfo"], dict):
+                    file_size = res["fileInfo"].get("fileSizeBytes")
+                elif res.get("formats") and isinstance(res["formats"], list) and len(res["formats"]) > 0:
+                    file_size = res["formats"][0].get("fileSizeBytes")
+
+                duration = None
+                thumb = None
+                if isinstance(res.get("metadata"), dict):
+                    duration = res["metadata"].get("durationSeconds")
+                    thumb = res["metadata"].get("thumbnailUrl")
+                if not thumb and res.get("assets") and isinstance(res["assets"], list) and len(res["assets"]) > 0:
+                    thumb = res["assets"][0].get("thumbnail")
+
+                results.append({
+                    "id": item_id,
+                    "url": u_str,
+                    "status": "ready",
+                    "downloadType": download_type,
+                    "title": title,
+                    "source": source,
+                    "fileSizeBytes": file_size,
+                    "duration": duration,
+                    "thumbnail": thumb,
+                    "selected": True,
+                    "analysisResult": res,
+                })
+            except Exception as exc:
+                results.append({
+                    "id": item_id,
+                    "url": u_str,
+                    "status": "failed",
+                    "error": str(exc),
+                    "selected": False,
+                })
+
+        return {
+            "success": True,
+            "results": results,
+            "errorsCount": len([r for r in results if r["status"] != "ready"]),
+        }
 
     def _handle_start_download(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         engine = payload.get("engine", "yt-dlp")

@@ -73,11 +73,25 @@ This document tracks progress through the 10 core milestones defined in the DROP
 ---
 
 ## Milestone 6: Playlist & Batch Processing
-- **Status:** Pending
+- **Status:** Complete
 - **Scope:**
-  - Playlist metadata inspection and item selection.
-  - Multi-URL batch ingestion (text paste and `.txt` file import).
-  - Independent tracking of each sub-job.
+  - Dedicated bounded playlist inspection (max 200 items, `extract_flat=True`, `playlistend`) without downloading media.
+  - Playlist metadata normalization (`id`, `title`, `url`, `source`, `totalCount`, `extractedCount`, `isTruncated`, `warnings`, `entries`).
+  - Handling of unavailable, deleted, or private videos (`isAvailable: false`, `selected: false`) without bypass attempts.
+  - Multi-URL batch parsing (`batchParser.ts`) with robust whitespace normalization, prose stripping, deduplication, and max 50 URLs bounding with excess reporting.
+  - Independent batch URL analysis across all supported types (`media`, `file`, `image`, `gallery`, `playlist`) with individual status tracking (`pending`, `analyzing`, `ready`, `unsupported`, `failed`).
+  - Unified `QueueManager` parent-child container architecture for playlists and batches (`engine: 'playlist' | 'batch'`):
+    - Parent container jobs do not consume active download slots (`maxConcurrentDownloads: 3`).
+    - Individual child jobs compete fairly under the authoritative concurrency scheduler.
+    - Deterministic filename collision resolution preventing overwrite conflicts.
+    - Partial failure tracking (`isPartialFailure: true`, `PARTIAL_FAILURE`).
+    - Partial retry: Retrying a parent re-queues only failed/cancelled children, preserving completed items.
+    - Cascading cancellation and removal preventing orphaned jobs.
+  - React UI:
+    - `AnalyzerPage`: Playlist entry selection panel with Select All / Deselect All, truncation warning, and `PLAYLIST` badge.
+    - `BatchPage`: Complete batch review workflow with text/file ingestion, multi-type badges, individual retry, remove, and enqueue controls.
+    - `DownloadsPage`: `PLAYLIST` and `BATCH` badges, partial failure indicators, and live retry controls.
+  - Verified acceptance: 45/45 Pytest tests passing, 49/49 Vitest tests passing across 9 suites, zero TypeScript errors (`tsc --noEmit`), and clean production build.
 
 ---
 
