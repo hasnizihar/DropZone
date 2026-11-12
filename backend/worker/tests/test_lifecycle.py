@@ -16,3 +16,4 @@ def test_lifecycle_shutdown_callback():
     # Second trigger should not execute callbacks again
     lifecycle.trigger_shutdown()
     assert len(called) == 1
+

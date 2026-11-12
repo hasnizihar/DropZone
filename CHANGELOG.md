@@ -2,6 +2,17 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.3] - 2026-11-12
+
+### Added
+- **yt-dlp Media Extraction Engine**: Integrated Python `yt-dlp` library with `YoutubeDL(download=False)` and isolated stderr logger (`YtDlpStderrLogger`) to guarantee stdout protocol purity.
+- **URL Security Boundary**: Implemented defensive URL validator blocking local/loopback and private IPv4/IPv6 ranges (`127.0.0.1`, `localhost`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.169.254`) and non-HTTP/HTTPS protocols.
+- **Metadata & Format Normalizers**: Robust conversion of raw extractor metadata to strict `MediaMetadata` and `MediaFormat` models, distinguishing exact (`fileSizeBytes`) from estimated (`estimatedFileSizeBytes`) sizes.
+- **Non-Blocking Dispatcher**: Added bounded `ThreadPoolExecutor(max_workers=2)` in worker dispatcher emitting asynchronous `analysis.started`, `analysis.completed`, and `analysis.failed` events without blocking heartbeat keepalives.
+- **WorkerManager Analyzer API**: Added `workerManager.analyzeUrl(url, timeoutMs)` and wired `IPC_CHANNELS.ANALYZER_INSPECT` to live Python worker extraction.
+- **URL Analyzer & Dashboard UI Integration**: Replaced static presets with live metadata cards (thumbnails, uploader, upload date, view count, duration) and interactive format selectors with filter tabs (`All`, `Combined`, `Video`, `Audio`).
+- **Comprehensive Test Suite**: Added 9 new Python unit tests (22 total) and 9 new TypeScript/React tests (27 total) covering contracts, Zod schemas, URL validation, and full Electron-to-worker loopback rejection integration.
+
 ## [1.0.0-alpha.2] - 2026-11-12
 
 ### Added

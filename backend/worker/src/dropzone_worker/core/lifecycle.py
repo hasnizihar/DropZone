@@ -44,3 +44,4 @@ class WorkerLifecycle:
             signal.signal(signal.SIGTERM, _handle_signal)
         except Exception:
             pass
+

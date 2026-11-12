@@ -30,12 +30,15 @@ This document tracks progress through the 10 core milestones defined in the DROP
 ---
 
 ## Milestone 3: Media Extraction
-- **Status:** Pending
+- **Status:** Completed (2026-11-12)
 - **Scope:**
-  - yt-dlp Python integration with structured hooks.
-  - URL analyzer & provider registry (YouTube, direct streams, etc.).
-  - Extraction of formats, resolutions, audio streams, thumbnails, and metadata.
-  - UI presentation of analyzed media with format pickers.
+  - Integrated `yt-dlp` Python library into background worker with `YoutubeDL(download=False)` and isolated stderr logger (`YtDlpStderrLogger`).
+  - Implemented URL security boundary (`url_validator.py`): enforces HTTP/HTTPS schemes, blocks loopback/private IPs (`127.0.0.1`, `localhost`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.169.254`).
+  - Built normalization services: `metadata_normalizer.py` (title, platform, uploader, upload date, duration, views/likes, thumbnails) and `format_normalizer.py` (resolution, codecs, container, exact vs estimated size separation, sorting).
+  - Implemented non-blocking worker execution using bounded thread pool (`ThreadPoolExecutor(max_workers=2)`) emitting `analysis.started`, `analysis.completed`, `analysis.failed` events without blocking heartbeat ping/pong.
+  - Extended shared TypeScript contracts (`metadata.ts`, `formats.ts`, `analysis.ts`, `commands.ts`, `events.ts`) and Zod validation schemas.
+  - Wired real metadata and format discovery into Electron IPC (`ANALYZER_INSPECT`), Zustand store (`useAppStore`), `AnalyzerPage` (format filter tabs, exact/estimated size badges, codec tags), and `DashboardPage`.
+  - Verified acceptance: 22/22 Pytest tests passing, 27/27 Vitest tests passing (including WorkerManager security loopback rejection integration test), clean TypeScript compilation (`tsc --noEmit`), and production build.
 
 ---
 

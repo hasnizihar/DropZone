@@ -60,3 +60,4 @@ def parse_incoming_line(line: str) -> ProtocolMessage:
         )
 
     return ProtocolMessage.from_dict(data)
+

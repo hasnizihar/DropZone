@@ -42,3 +42,4 @@ export class WorkerHandshakeError extends WorkerError {
     this.name = 'WorkerHandshakeError';
   }
 }
+

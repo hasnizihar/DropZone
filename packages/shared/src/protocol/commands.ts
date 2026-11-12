@@ -3,6 +3,7 @@ export const WORKER_COMMANDS = {
   PING: 'ping',
   GET_STATUS: 'get_status',
   SHUTDOWN: 'shutdown',
+  ANALYZE_URL: 'analyze_url',
 } as const;
 
 export type WorkerCommandName = typeof WORKER_COMMANDS[keyof typeof WORKER_COMMANDS] | string;
@@ -49,3 +50,4 @@ export interface ShutdownResponsePayload {
   shuttingDown: boolean;
   reason?: string;
 }
+

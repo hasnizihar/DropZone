@@ -30,3 +30,9 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - Worker stdout is reserved for protocol messages; all logging goes to stderr.
    - Logs never record authentication tokens, cookies, or user credentials.
    - Diagnostic output is scrubbed of sensitive query parameters where applicable.
+
+6. **URL Validation & Network Security (Milestone 3)**
+   - Media URLs are validated defensively prior to invocation (`UrlValidator`).
+   - Allowed protocols are strictly restricted to `http` and `https` (rejecting `file:`, `data:`, `javascript:`, `ftp:`, `smb:`, etc.).
+   - Access to private network addresses, loopback interfaces (`127.0.0.1`, `localhost`, `::1`), RFC 1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), and cloud metadata services (`169.254.169.254`) is strictly blocked to prevent SSRF vulnerabilities.
+   - Media extraction operates strictly in no-download mode (`download=False`, `noplaylist=True`). DRM bypass, authentication circumvention, and credential stuffing are prohibited.

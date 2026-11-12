@@ -110,7 +110,12 @@ describe('WorkerManager Full Integration with Python Subprocess', () => {
       expect(workerStatus.workerVersion).toBe('1.0.0');
       expect(workerStatus.protocolVersion).toBe('1.0');
 
-      // 4. Graceful stop
+      // 4. Test analyzeUrl security boundary (loopback address rejection)
+      await expect(manager.analyzeUrl('http://127.0.0.1:8080/test.mp4')).rejects.toThrow(
+        /loopback/i
+      );
+
+      // 5. Graceful stop
       await manager.stop();
       expect(manager.getStatusInfo().state).toBe('stopped');
       expect(manager.getStatusInfo().isAlive).toBe(false);
@@ -119,3 +124,4 @@ describe('WorkerManager Full Integration with Python Subprocess', () => {
     }
   }, 20000);
 });
+

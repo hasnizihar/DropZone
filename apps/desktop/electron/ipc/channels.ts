@@ -42,4 +42,7 @@ export const IPC_CHANNELS = {
   EVENT_ENGINE_STATUS: 'event:engine-status',
   EVENT_WORKER_STATUS_CHANGED: 'event:worker-status-changed',
   EVENT_WORKER_ERROR: 'event:worker-error',
+  EVENT_ANALYSIS_STARTED: 'event:analysis-started',
+  EVENT_ANALYSIS_COMPLETED: 'event:analysis-completed',
+  EVENT_ANALYSIS_FAILED: 'event:analysis-failed',
 } as const;

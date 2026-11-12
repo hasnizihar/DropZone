@@ -92,3 +92,4 @@ def test_full_worker_process_stdio():
     finally:
         if proc.poll() is None:
             proc.kill()
+

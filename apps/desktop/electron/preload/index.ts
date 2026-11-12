@@ -59,6 +59,30 @@ const dropzoneApi = {
       ipcRenderer.removeListener(IPC_CHANNELS.EVENT_WORKER_ERROR, handler);
     };
   },
+
+  onAnalysisStarted: (callback: (payload: Record<string, any>) => void) => {
+    const handler = (_event: any, payload: Record<string, any>) => callback(payload);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_ANALYSIS_STARTED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_ANALYSIS_STARTED, handler);
+    };
+  },
+
+  onAnalysisCompleted: (callback: (payload: Record<string, any>) => void) => {
+    const handler = (_event: any, payload: Record<string, any>) => callback(payload);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_ANALYSIS_COMPLETED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_ANALYSIS_COMPLETED, handler);
+    };
+  },
+
+  onAnalysisFailed: (callback: (payload: Record<string, any>) => void) => {
+    const handler = (_event: any, payload: Record<string, any>) => callback(payload);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_ANALYSIS_FAILED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_ANALYSIS_FAILED, handler);
+    };
+  },
   onDownloadProgress: (callback: (job: DownloadJob) => void) => {
     const handler = (_event: any, job: DownloadJob) => callback(job);
     ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOAD_PROGRESS, handler);

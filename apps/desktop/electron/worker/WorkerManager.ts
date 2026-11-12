@@ -16,6 +16,7 @@ import {
   WorkerHealthState,
   WORKER_COMMANDS,
   WORKER_EVENTS,
+  AnalyzeUrlResponsePayload,
 } from '@dropzone/shared';
 
 interface PendingRequest {
@@ -154,6 +155,14 @@ export class WorkerManager extends EventEmitter {
     }
   }
 
+  public async analyzeUrl(url: string, timeoutMs = 35000): Promise<AnalyzeUrlResponsePayload> {
+    return this.sendRequest<AnalyzeUrlResponsePayload>(
+      WORKER_COMMANDS.ANALYZE_URL,
+      { url },
+      timeoutMs
+    );
+  }
+
   public async getStatus(): Promise<any> {
     if (this.healthMonitor.getState() === 'healthy') {
       try {
@@ -288,3 +297,4 @@ export class WorkerManager extends EventEmitter {
     }
   }
 }
+

@@ -100,6 +100,7 @@ function setupIpcHandlers() {
   // System & Environment
   ipcMain.handle(IPC_CHANNELS.SYSTEM_GET_INFO, async () => {
     const engines = await getSystemEnginesReport();
+    engines.workerRunning = workerManager.getStatusInfo().isAlive;
     return {
       version: app.getVersion() || '1.0.0',
       platform: process.platform,
@@ -108,7 +109,9 @@ function setupIpcHandlers() {
   });
 
   ipcMain.handle(IPC_CHANNELS.SYSTEM_GET_ENGINES, async () => {
-    return await getSystemEnginesReport();
+    const engines = await getSystemEnginesReport();
+    engines.workerRunning = workerManager.getStatusInfo().isAlive;
+    return engines;
   });
 
   ipcMain.handle(IPC_CHANNELS.SYSTEM_SELECT_DIRECTORY, async () => {
@@ -155,57 +158,57 @@ function setupIpcHandlers() {
     return appSettings;
   });
 
-  // Analyzer stub (wired to Python worker in Milestone 3)
+  // Media Analyzer (Milestone 3 with real Python yt-dlp worker backend)
   ipcMain.handle(IPC_CHANNELS.ANALYZER_INSPECT, async (_event, url: string) => {
     if (!url || typeof url !== 'string' || !url.trim().startsWith('http')) {
       return { success: false, error: 'Please enter a valid HTTP or HTTPS URL.' };
     }
 
-    // Identify source engine type
-    let engine: 'yt-dlp' | 'direct-http' = 'yt-dlp';
-    let category: 'video' | 'file' = 'video';
-    const lower = url.toLowerCase();
-
-    if (lower.match(/\.(mp4|mkv|webm|avi|mov)$/i)) {
-      category = 'video';
-      engine = 'direct-http';
-    } else if (lower.match(/\.(mp3|m4a|flac|wav|ogg)$/i)) {
-      category = 'file';
-      engine = 'direct-http';
-    } else if (lower.match(/\.(zip|tar|gz|7z|rar|iso|exe|msi|pdf|docx|xlsx)$/i)) {
-      category = 'file';
-      engine = 'direct-http';
-    }
-
-    // Extract provider name
-    let source = 'Direct Download';
     try {
-      const parsed = new URL(url);
-      source = parsed.hostname.replace('www.', '');
-    } catch {
-      // ignore
-    }
+      if (!workerManager.getStatusInfo().isAlive) {
+        try {
+          await workerManager.start();
+        } catch (startErr: any) {
+          return {
+            success: false,
+            error: `Background worker engine is not running: ${startErr.message}`,
+          };
+        }
+      }
 
-    // Return preliminary inspection metadata
-    const info: MediaInfo = {
-      url,
-      canonicalUrl: url,
-      title: url.split('/').pop()?.split('?')[0] || 'Media Item',
-      source,
-      category,
-      engine,
-      isPlaylist: false,
-      formats: [
-        {
-          formatId: 'best',
-          extension: category === 'video' ? 'mp4' : 'bin',
-          resolution: 'Optimal',
-          note: 'Best available quality',
+      const response = await workerManager.analyzeUrl(url.trim(), 35000);
+      if (!response || !response.success || !response.metadata) {
+        return { success: false, error: 'Media analyzer returned empty or invalid response.' };
+      }
+
+      // Convert to MediaInfo format for renderer
+      const info: MediaInfo = {
+        url: response.metadata.originalUrl || url.trim(),
+        metadata: response.metadata,
+        formats: response.formats || [],
+        extractor: response.extractor || {
+          name: response.metadata.platform,
+          key: response.metadata.extractor,
         },
-      ],
-    };
+        analysisDurationMs: response.analysisDurationMs || 0,
+        title: response.metadata.title,
+        thumbnail: response.metadata.thumbnailUrl || undefined,
+        source: response.metadata.platform,
+        duration: response.metadata.durationSeconds || undefined,
+        category: response.metadata.mediaType === 'audio' ? 'file' : 'video',
+        engine: 'yt-dlp',
+        isPlaylist: response.metadata.isPlaylist || false,
+        playlistItemsCount: response.metadata.playlistCount || undefined,
+      };
 
-    return { success: true, data: info };
+      return { success: true, data: info };
+    } catch (err: any) {
+      console.error('[Analyzer Error]', err);
+      return {
+        success: false,
+        error: err?.message || 'Failed to extract media information.',
+      };
+    }
   });
 
   // Job Management
@@ -329,13 +332,35 @@ function setupIpcHandlers() {
 
       results.push({
         url,
-        canonicalUrl: url,
         title: url.split('/').pop()?.split('?')[0] || 'Media Item',
         source,
         category: 'video',
         engine: 'yt-dlp',
         isPlaylist: false,
-        formats: [{ formatId: 'best', extension: 'mp4', resolution: 'Optimal' }],
+        analysisDurationMs: 0,
+        extractor: { name: source, key: 'generic' },
+        metadata: {
+          id: url,
+          title: url.split('/').pop()?.split('?')[0] || 'Media Item',
+          platform: source,
+          extractor: 'generic',
+          originalUrl: url,
+          mediaType: 'video',
+          isPlaylist: false,
+        },
+        formats: [
+          {
+            formatId: 'best',
+            extension: 'mp4',
+            resolution: 'Optimal',
+            isVideo: true,
+            isAudio: true,
+            isCombined: true,
+            hasVideo: true,
+            hasAudio: true,
+            qualityLabel: 'Best Quality',
+          },
+        ],
       });
     }
 
@@ -428,6 +453,17 @@ app.whenReady().then(async () => {
   workerManager.on('worker-error', (err) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(IPC_CHANNELS.EVENT_WORKER_ERROR, err);
+    }
+  });
+
+  workerManager.on('worker-event', (event: any) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (event.command === 'analysis.started') {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_ANALYSIS_STARTED, event.payload);
+    } else if (event.command === 'analysis.completed') {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_ANALYSIS_COMPLETED, event.payload);
+    } else if (event.command === 'analysis.failed') {
+      mainWindow.webContents.send(IPC_CHANNELS.EVENT_ANALYSIS_FAILED, event.payload);
     }
   });
 

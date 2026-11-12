@@ -114,6 +114,36 @@ Communication over standard input/output follows the DROPZONE Protocol v1.0. Eve
 
 ## 3. Security Boundary
 - Preload script uses `contextBridge.exposeInMainWorld` to expose only safe, explicit methods.
-- URLs submitted to the analyzer are validated against known protocols (http, https).
+- URLs submitted to the analyzer are validated against known protocols (http, https) and defensive network checks (`UrlValidator` rejects private, loopback, and cloud metadata IP ranges).
 - Target file paths are sanitized to prevent directory traversal attacks (`..`).
 - Subprocess spawning uses `child_process.spawn()` with `shell: false` and strict argument arrays.
+
+---
+
+## 4. Media Extraction Architecture (Milestone 3)
+
+### 4.1 Non-Blocking Extraction Model
+To maintain heartbeat responsiveness (`ping`/`pong`) during long extractions, the Python worker implements non-blocking execution via a bounded `ThreadPoolExecutor(max_workers=2)`. Stdio writes are guarded by a `threading.Lock()` to prevent interleaving of JSON lines.
+
+### 4.2 Extraction Pipeline
+```
+Raw URL Input
+   │
+   ▼
+UrlValidator (Protocol & private IP checks: 127.0.0.1, 10.x, 172.x, 192.168.x, 169.254.x)
+   │
+   ▼
+YtDlpEngine (YoutubeDL with download=False, noplaylist=True, stderr logging)
+   │
+   ├─► MetadataNormalizer (Title, platform, duration, views, uploader, thumbnails)
+   └─► FormatNormalizer (Resolution, codecs, container, exact vs estimated sizes, sorting)
+   │
+   ▼
+Dispatcher Event / Response Emitter
+   ├─► 'analysis.started'
+   ├─► Response Payload (success: true, metadata, formats, durationMs)
+   └─► 'analysis.completed' / 'analysis.failed'
+```
+
+### 4.3 Format Classification & Size Fidelity
+Formats are cleanly categorized into `isCombined` (audio + video), `isVideo` (video stream only), and `isAudio` (audio stream only). Exact sizes (`filesize`) and estimated sizes (`filesize_approx`) are strictly segregated to avoid misleading the user with inaccurate file sizes.

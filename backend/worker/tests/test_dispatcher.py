@@ -65,3 +65,4 @@ def test_dispatch_unknown_command(dispatcher_fixture):
 
     assert exc_info.value.code == ProtocolErrorCode.UNKNOWN_COMMAND
     assert health.errors_count == 1
+

@@ -5,6 +5,7 @@ import type {
   AppSettings,
   SystemEnginesReport,
   CreateDownloadOptions,
+  AnalysisStatus,
 } from '@dropzone/shared';
 import { DEFAULT_SETTINGS } from '@dropzone/shared';
 
@@ -27,8 +28,11 @@ interface AppState {
   activeTab: NavigationTab;
   jobs: DownloadJob[];
   analyzedMedia: MediaInfo | null;
+  analysisStatus: AnalysisStatus;
+  selectedFormatId: string | null;
   isAnalyzing: boolean;
   analyzeError: string | null;
+  analysisDurationMs: number | null;
   systemInfo: { version: string; platform: string; engines: SystemEnginesReport } | null;
   settings: AppSettings;
   toast: Toast | null;
@@ -37,6 +41,8 @@ interface AppState {
   // Actions
   setActiveTab: (tab: NavigationTab) => void;
   setAnalyzedMedia: (media: MediaInfo | null) => void;
+  setSelectedFormatId: (formatId: string | null) => void;
+  resetAnalysis: () => void;
   showToast: (text: string, type?: 'info' | 'success' | 'error') => void;
   clearToast: () => void;
   
@@ -65,8 +71,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTab: 'dashboard',
   jobs: [],
   analyzedMedia: null,
+  analysisStatus: 'idle',
+  selectedFormatId: null,
   isAnalyzing: false,
   analyzeError: null,
+  analysisDurationMs: null,
   systemInfo: null,
   settings: DEFAULT_SETTINGS,
   toast: null,
@@ -74,7 +83,27 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setActiveTab: (activeTab) => set({ activeTab }),
 
-  setAnalyzedMedia: (analyzedMedia) => set({ analyzedMedia, analyzeError: null }),
+  setAnalyzedMedia: (analyzedMedia) => {
+    const defaultFmt = analyzedMedia?.formats?.find((f) => f.isCombined) || analyzedMedia?.formats?.[0];
+    set({
+      analyzedMedia,
+      selectedFormatId: defaultFmt?.formatId || null,
+      analysisStatus: analyzedMedia ? 'completed' : 'idle',
+      analyzeError: null,
+    });
+  },
+
+  setSelectedFormatId: (selectedFormatId) => set({ selectedFormatId }),
+
+  resetAnalysis: () =>
+    set({
+      analyzedMedia: null,
+      selectedFormatId: null,
+      isAnalyzing: false,
+      analysisStatus: 'idle',
+      analyzeError: null,
+      analysisDurationMs: null,
+    }),
 
   showToast: (text, type = 'info') => {
     const id = Date.now().toString();
@@ -145,31 +174,96 @@ export const useAppStore = create<AppState>((set, get) => ({
           get().showToast(err.payload?.message || 'Worker error occurred', 'error');
         });
       }
+
+      // Analysis Lifecycle listeners (Milestone 3)
+      if (window.dropzone.onAnalysisStarted) {
+        window.dropzone.onAnalysisStarted(() => {
+          set({ analysisStatus: 'analyzing', isAnalyzing: true, analyzeError: null });
+        });
+      }
+
+      if (window.dropzone.onAnalysisCompleted) {
+        window.dropzone.onAnalysisCompleted(() => {
+          set({ analysisStatus: 'completed', isAnalyzing: false });
+        });
+      }
+
+      if (window.dropzone.onAnalysisFailed) {
+        window.dropzone.onAnalysisFailed((payload) => {
+          set({
+            analysisStatus: 'failed',
+            isAnalyzing: false,
+            analyzeError: payload.error || 'Analysis failed',
+          });
+        });
+      }
     } catch (err: any) {
       console.error('Failed to initialize desktop store:', err);
     }
   },
 
   inspectUrl: async (url: string) => {
-    if (!url.trim()) return false;
-    set({ isAnalyzing: true, analyzeError: null });
+    const trimmed = url.trim();
+    if (!trimmed) {
+      set({ analyzeError: 'Please enter a URL to inspect.', analysisStatus: 'failed' });
+      return false;
+    }
+
+    set({
+      isAnalyzing: true,
+      analysisStatus: 'validating',
+      analyzeError: null,
+    });
+
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      const err = 'Invalid URL protocol: Only HTTP and HTTPS URLs are supported.';
+      set({
+        isAnalyzing: false,
+        analysisStatus: 'failed',
+        analyzeError: err,
+      });
+      get().showToast(err, 'error');
+      return false;
+    }
+
+    set({ analysisStatus: 'analyzing' });
 
     try {
       if (typeof window !== 'undefined' && window.dropzone) {
-        const res = await window.dropzone.inspectUrl(url);
+        const res = await window.dropzone.inspectUrl(trimmed);
         if (res.success && res.data) {
-          set({ analyzedMedia: res.data, isAnalyzing: false });
+          const defaultFmt = res.data.formats?.find((f) => f.isCombined) || res.data.formats?.[0];
+          set({
+            analyzedMedia: res.data,
+            selectedFormatId: defaultFmt?.formatId || null,
+            isAnalyzing: false,
+            analysisStatus: 'completed',
+            analysisDurationMs: res.data.analysisDurationMs || null,
+            analyzeError: null,
+          });
           return true;
         } else {
-          set({ isAnalyzing: false, analyzeError: res.error || 'Failed to inspect URL' });
-          get().showToast(res.error || 'Failed to inspect URL', 'error');
+          const err = res.error || 'Failed to inspect URL';
+          const isTimeout = err.toLowerCase().includes('timeout');
+          set({
+            isAnalyzing: false,
+            analysisStatus: isTimeout ? 'timeout' : 'failed',
+            analyzeError: err,
+          });
+          get().showToast(err, 'error');
           return false;
         }
       }
       return false;
     } catch (err: any) {
-      set({ isAnalyzing: false, analyzeError: err.message || 'Inspection error' });
-      get().showToast(err.message || 'Inspection error', 'error');
+      const errMsg = err?.message || 'Inspection error occurred';
+      const isTimeout = errMsg.toLowerCase().includes('timeout');
+      set({
+        isAnalyzing: false,
+        analysisStatus: isTimeout ? 'timeout' : 'failed',
+        analyzeError: errMsg,
+      });
+      get().showToast(errMsg, 'error');
       return false;
     }
   },

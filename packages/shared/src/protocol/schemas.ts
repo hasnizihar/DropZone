@@ -42,3 +42,4 @@ export const WorkerStatusPayloadSchema = z.object({
   errorsCount: z.number(),
   capabilities: z.array(z.string()),
 });
+

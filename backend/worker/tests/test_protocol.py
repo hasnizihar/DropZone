@@ -56,3 +56,4 @@ def test_create_event():
     assert evt.type == "event"
     assert evt.command == "worker.ready"
     assert evt.payload["pid"] == 9999
+

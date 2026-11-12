@@ -6,6 +6,21 @@ class ProtocolErrorCode:
     TIMEOUT = "TIMEOUT"
     SHUTTING_DOWN = "SHUTTING_DOWN"
 
+    # Media Extraction & Analysis Error Codes (Milestone 3)
+    INVALID_URL = "INVALID_URL"
+    UNSUPPORTED_URL = "UNSUPPORTED_URL"
+    EXTRACTION_FAILED = "EXTRACTION_FAILED"
+    NETWORK_ERROR = "NETWORK_ERROR"
+    NETWORK_TIMEOUT = "NETWORK_TIMEOUT"
+    GEO_RESTRICTED = "GEO_RESTRICTED"
+    PRIVATE_CONTENT = "PRIVATE_CONTENT"
+    AUTH_REQUIRED = "AUTH_REQUIRED"
+    RATE_LIMITED = "RATE_LIMITED"
+    EXTRACTOR_UNAVAILABLE = "EXTRACTOR_UNAVAILABLE"
+    ENGINE_UNAVAILABLE = "ENGINE_UNAVAILABLE"
+    ANALYSIS_TIMEOUT = "ANALYSIS_TIMEOUT"
+    UNKNOWN_ERROR = "UNKNOWN_ERROR"
+
 class WorkerProtocolError(Exception):
     def __init__(self, code: str, message: str, details: dict = None):
         super().__init__(message)

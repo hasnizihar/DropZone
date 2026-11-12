@@ -13,3 +13,4 @@ def serialize_message(message: Union[ProtocolMessage, Dict[str, Any]]) -> str:
         data = message
 
     return json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+

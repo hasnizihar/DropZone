@@ -11,11 +11,11 @@ Electron Main Process
        │  stdin  (JSONL Requests)
        ▼
 dropzone_worker
-  ├── Parser & Serializer
-  ├── Protocol Models
-  ├── Command Dispatcher (hello, ping, get_status, shutdown)
-  ├── Health Monitor
-  └── Lifecycle Manager
+  ├── Core (Dispatcher, Health, Lifecycle)
+  ├── Engines (YtDlpEngine)
+  ├── Services (UrlValidator, MetadataNormalizer, FormatNormalizer, MediaAnalyzerService)
+  ├── Protocol (Models, Parser, Serializer, Errors)
+  └── Utils (Logging configuration)
        │  stdout (JSONL Responses & Events)
        ▼
 Electron Main Process
@@ -34,6 +34,7 @@ Electron Main Process
 | `ping` | Heartbeat keepalive | `{}` |
 | `get_status` | Detailed telemetry & health | `{}` |
 | `shutdown` | Controlled graceful termination | `{"reason": "app_exit"}` |
+| `analyze_url` | Non-blocking media inspection with yt-dlp | `{"url": "https://..."}` |
 
 ---
 
@@ -43,6 +44,9 @@ Electron Main Process
 - `worker.shutting_down`: Emitted prior to process exit.
 - `worker.status`: Telemetry updates.
 - `worker.error`: Error notifications.
+- `analysis.started`: Fired when a media analysis worker thread starts.
+- `analysis.completed`: Fired upon successful format & metadata extraction.
+- `analysis.failed`: Fired on validation or extraction failure.
 
 ---
 
@@ -60,3 +64,4 @@ python backend/worker/src/dropzone_worker/__main__.py
 ```bash
 python -m pytest backend/worker/tests
 ```
+

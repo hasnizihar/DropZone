@@ -76,3 +76,4 @@ def create_event(event_name: str, payload: Dict[str, Any]) -> ProtocolMessage:
         command=event_name,
         payload=payload,
     )
+

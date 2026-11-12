@@ -23,7 +23,7 @@
 
 3. **Install Python Worker Dependencies & Pytest:**
    ```bash
-   python -m pip install pytest pydantic psutil
+   python -m pip install pytest pydantic psutil yt-dlp
    ```
 
 4. **Run Development Server:**

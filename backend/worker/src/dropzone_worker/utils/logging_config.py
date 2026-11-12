@@ -27,3 +27,4 @@ def setup_worker_logging(level: int = logging.INFO) -> logging.Logger:
     logger.propagate = False
 
     return logger
+

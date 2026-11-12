@@ -119,3 +119,4 @@ export class WorkerProcess {
     return !!this.proc && !this.proc.killed;
   }
 }
+

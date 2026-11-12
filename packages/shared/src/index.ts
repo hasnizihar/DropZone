@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
 export * from './protocol';
+export * from './media';
+
+import type { MediaMetadata } from './media/metadata';
+import type { MediaFormat } from './media/formats';
+import type { ExtractorInfo } from './media/analysis';
 
 // ==========================================
 // 1. BRAND & THEME TOKENS
@@ -58,25 +63,8 @@ export type DownloadEngineType =
   | 'ffmpeg';
 
 // ==========================================
-// 3. MEDIA FORMAT & ANALYSIS MODELS
+// 3. MEDIA ANALYSIS INFO MODEL
 // ==========================================
-export interface MediaFormat {
-  formatId: string;
-  extension: string;
-  resolution?: string;
-  width?: number;
-  height?: number;
-  fps?: number;
-  vcodec?: string;
-  acodec?: string;
-  fileSize?: number;
-  filesizeApprox?: number;
-  tbr?: number;
-  isAudioOnly?: boolean;
-  isVideoOnly?: boolean;
-  note?: string;
-}
-
 export interface PlaylistItemInfo {
   id: string;
   index: number;
@@ -88,21 +76,19 @@ export interface PlaylistItemInfo {
 
 export interface MediaInfo {
   url: string;
-  canonicalUrl?: string;
-  title: string;
-  description?: string;
-  thumbnail?: string;
-  duration?: number;
-  source: string;
-  category: ContentCategory;
-  uploader?: string;
+  metadata: MediaMetadata;
   formats: MediaFormat[];
-  bestVideoFormatId?: string;
-  bestAudioFormatId?: string;
+  extractor: ExtractorInfo;
+  analysisDurationMs: number;
+  // Convenience accessors
+  title: string;
+  thumbnail?: string;
+  source: string;
+  duration?: number;
+  category: ContentCategory;
+  engine: DownloadEngineType;
   isPlaylist: boolean;
   playlistItemsCount?: number;
-  playlistItems?: PlaylistItemInfo[];
-  engine: DownloadEngineType;
 }
 
 // ==========================================
@@ -199,7 +185,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 // 7. IPC CONTRACT SPECIFICATION
 // ==========================================
 export interface IpcRendererToMainApi {
-  // Analyzer
+  // Analyzer (Milestone 3 with real yt-dlp worker backend)
   inspectUrl(url: string): Promise<{ success: boolean; data?: MediaInfo; error?: string }>;
   
   // Job Management
@@ -244,7 +230,9 @@ declare global {
       onEngineStatusChanged(callback: (report: SystemEnginesReport) => void): () => void;
       onWorkerStatusChanged(callback: (status: Record<string, any>) => void): () => void;
       onWorkerError(callback: (error: Record<string, any>) => void): () => void;
+      onAnalysisStarted(callback: (payload: Record<string, any>) => void): () => void;
+      onAnalysisCompleted(callback: (payload: Record<string, any>) => void): () => void;
+      onAnalysisFailed(callback: (payload: Record<string, any>) => void): () => void;
     };
   }
 }
-

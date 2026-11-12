@@ -1,5 +1,6 @@
 import sys
 import logging
+import threading
 from .utils.logging_config import setup_worker_logging
 from .protocol.models import create_event, create_error
 from .protocol.parser import parse_incoming_line
@@ -10,14 +11,18 @@ from .core.lifecycle import WorkerLifecycle
 from .core.dispatcher import CommandDispatcher
 from . import __version__, PROTOCOL_VERSION
 
+stdout_lock = threading.Lock()
+
 def write_stdout_message(msg) -> None:
     """
     Writes a single protocol message to stdout with trailing newline and flushes immediately.
+    Thread-safe to prevent interleaved messages from concurrent tasks.
     """
     try:
         raw_json = serialize_message(msg)
-        sys.stdout.write(raw_json + "\n")
-        sys.stdout.flush()
+        with stdout_lock:
+            sys.stdout.write(raw_json + "\n")
+            sys.stdout.flush()
     except Exception as exc:
         sys.stderr.write(f"[DROPZONE_WORKER ERROR] Failed writing to stdout: {exc}\n")
         sys.stderr.flush()
@@ -32,7 +37,9 @@ def run() -> int:
     health = WorkerHealthMonitor()
     lifecycle = WorkerLifecycle()
     lifecycle.setup_signal_handlers()
-    dispatcher = CommandDispatcher(health, lifecycle)
+
+    # Pass write_stdout_message callback so asynchronous commands can stream output thread-safely
+    dispatcher = CommandDispatcher(health, lifecycle, write_message_fn=write_stdout_message)
 
     # Emit initial worker.ready event
     ready_event = create_event(
@@ -65,7 +72,8 @@ def run() -> int:
 
                 # Dispatch command
                 response = dispatcher.dispatch(request)
-                write_stdout_message(response)
+                if response is not None:
+                    write_stdout_message(response)
 
             except WorkerProtocolError as proto_err:
                 health.record_error()

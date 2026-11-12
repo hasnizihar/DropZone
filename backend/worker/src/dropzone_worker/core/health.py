@@ -52,3 +52,4 @@ class WorkerHealthMonitor:
             "errorsCount": self.errors_count,
             "capabilities": ["ping", "hello", "get_status", "shutdown"],
         }
+
