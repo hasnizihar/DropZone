@@ -85,29 +85,94 @@ export class WorkerProcess {
     return isWin ? 'python' : 'python3';
   }
 
+  public static resolveStandaloneWorkerExecutable(): string | null {
+    if (process.env.DROPZONE_WORKER_BIN && fs.existsSync(process.env.DROPZONE_WORKER_BIN)) {
+      return process.env.DROPZONE_WORKER_BIN;
+    }
+
+    const isWin = process.platform === 'win32';
+    const binaryName = isWin ? 'dropzone-worker.exe' : 'dropzone-worker';
+
+    // 1. Packaged Electron resources directory
+    if (process.resourcesPath) {
+      const candidatesInResources = [
+        path.join(process.resourcesPath, 'worker', binaryName),
+        path.join(process.resourcesPath, 'bin', binaryName),
+        path.join(process.resourcesPath, binaryName),
+      ];
+      for (const cand of candidatesInResources) {
+        if (fs.existsSync(cand)) {
+          return cand;
+        }
+      }
+    }
+
+    // 2. Development relative paths
+    const devCandidates = [
+      path.resolve(__dirname, '../../resources/worker', binaryName),
+      path.resolve(__dirname, '../../../resources/worker', binaryName),
+      path.resolve(__dirname, '../../../../resources/worker', binaryName),
+      path.resolve(process.cwd(), 'apps/desktop/resources/worker', binaryName),
+      path.resolve(process.cwd(), 'resources/worker', binaryName),
+    ];
+    for (const cand of devCandidates) {
+      if (fs.existsSync(cand)) {
+        return cand;
+      }
+    }
+
+    return null;
+  }
+
   public spawn(): void {
     if (this.proc) {
       throw new Error('Worker process is already running.');
     }
 
-    const workerRoot = WorkerProcess.resolveWorkerRoot(this.options.workerRoot);
-    const pythonExecutable = WorkerProcess.resolvePythonExecutable(this.options.customPythonPath, workerRoot);
-    const workerSrc = path.join(workerRoot, 'src');
-
-    const env = {
-      ...process.env,
-      PYTHONPATH: workerSrc,
-      PYTHONUNBUFFERED: '1',
-    };
-
     this.parser.reset();
 
-    this.proc = spawn(pythonExecutable, ['-m', 'dropzone_worker'], {
-      cwd: workerSrc,
-      env,
-      shell: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
+    const standaloneBinary = WorkerProcess.resolveStandaloneWorkerExecutable();
+    let isPackaged = false;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const electron = require('electron');
+      if (electron?.app?.isPackaged) {
+        isPackaged = true;
+      }
+    } catch {
+      // ignore outside Electron
+    }
+
+    if (standaloneBinary) {
+      this.proc = spawn(standaloneBinary, [], {
+        cwd: path.dirname(standaloneBinary),
+        shell: false,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } else {
+      if (isPackaged && !process.env.DROPZONE_ALLOW_GLOBAL_PYTHON) {
+        throw new Error(
+          'Packaged DROPZONE background worker binary (dropzone-worker.exe) was not found in application resources. Please reinstall DROPZONE.'
+        );
+      }
+
+      const workerRoot = WorkerProcess.resolveWorkerRoot(this.options.workerRoot);
+      const pythonExecutable = WorkerProcess.resolvePythonExecutable(this.options.customPythonPath, workerRoot);
+      const workerSrc = path.join(workerRoot, 'src');
+
+      const env = {
+        ...process.env,
+        PYTHONPATH: workerSrc,
+        PYTHONUNBUFFERED: '1',
+      };
+
+      this.proc = spawn(pythonExecutable, ['-m', 'dropzone_worker'], {
+        cwd: workerSrc,
+        env,
+        shell: false,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    }
 
     this.proc.stdout?.setEncoding('utf8');
     this.proc.stdout?.on('data', (chunk: string) => {

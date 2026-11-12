@@ -182,9 +182,16 @@ This document tracks progress through the 10 core milestones defined in the DROP
 
 ---
 
-## Milestone 10: Packaging & Distribution
-- **Status:** Pending
+## Milestone 10: Packaging & Windows Distribution
+- **Status:** Complete (2026-11-13)
 - **Scope:**
-  - Packaging with `electron-builder`.
-  - Windows NSIS installer and portable `.exe`.
-  - Binary bundling verification and release documentation.
+  - Automated production packaging via `electron-builder` producing both a Windows NSIS installer and a zero-install portable Windows package.
+  - Built standalone Python worker executable (`dropzone-worker.exe`, 29.57 MB) utilizing PyInstaller with dynamic package metadata collection for `yt-dlp`, `gallery-dl`, `requests`, `psutil`, `pydantic`, eliminating any global Python interpreter dependency on the user's PC.
+  - Generated multi-resolution Windows application assets (`icon.ico` and `icon.png` in 16x16 through 256x256) aligned with DROPZONE design tokens (Near Black `#121417`, Acid Lime `#D4FF5C`, Warm Off-White `#F5F3EF`, Graphite Grey `#282C35`).
+  - Runtime worker executable resolution in `WorkerProcess.ts` discovering packaged `dropzone-worker.exe` in `process.resourcesPath` while preserving development python scripts.
+  - Windows Application Control (Smart App Control / WDAC) idempotency patch (`scripts/patch-electron-builder.cjs`) allowing NSIS uninstaller generation via binary parsing (`UninstallerReader.exec`) without requiring unsigned execution.
+  - Evidence-based external FFmpeg distribution policy with clear missing-dependency states, runtime detection, and configuration overrides.
+  - Packaged runtime smoke tests (`scripts/smoke-test-packaged.cjs` / `npm run smoke:packaged`) validating main process boot, SQLite initialization, settings load, standalone worker protocol handshake, and clean shutdown.
+  - Third-party licensing audit and comprehensive `THIRD_PARTY_NOTICES.md` covering Electron, Chromium, Node.js, Python, yt-dlp, gallery-dl, requests, psutil, sql.js, and FFmpeg.
+  - Verified SHA-256 checksums in `release/SHA256SUMS.txt`.
+  - Verified acceptance: 56/56 Pytest tests passing, 83/83 Vitest tests passing across 13 test files, zero TypeScript errors across all workspaces, clean production build, and verified packaged application smoke test.

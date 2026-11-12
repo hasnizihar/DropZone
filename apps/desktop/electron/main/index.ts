@@ -57,6 +57,10 @@ const queueManager = new QueueManager(workerManager, {
 });
 
 function createWindow(): BrowserWindow {
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'resources', 'icon.png')
+    : path.resolve(__dirname, '../../resources/icon.png');
+
   const win = new BrowserWindow({
     width: 1240,
     height: 820,
@@ -64,6 +68,7 @@ function createWindow(): BrowserWindow {
     minHeight: 640,
     frame: false,
     backgroundColor: '#121417',
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),

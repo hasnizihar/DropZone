@@ -1,6 +1,8 @@
 {
   "name": "@dropzone/desktop",
-  "version": "1.0.0",
+  "version": "1.0.0-alpha.10",
+  "description": "Universal Desktop Download Manager",
+  "author": "DROPZONE Contributors",
   "private": true,
   "main": "./dist/main/index.cjs",
   "scripts": {
@@ -10,7 +12,10 @@
     "build": "npm run build:electron && vite build",
     "build:electron": "node scripts/build-electron.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package:win": "electron-builder --win nsis --config electron-builder.yml",
+    "package:portable": "electron-builder --win portable --config electron-builder.yml",
+    "package:all": "electron-builder --win --config electron-builder.yml"
   },
   "dependencies": {
     "@dropzone/shared": "*",
@@ -33,7 +38,8 @@
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.2",
     "cross-env": "^7.0.3",
-    "electron": "^34.3.0",
+    "electron": "34.5.8",
+    "electron-builder": "^26.18.0",
     "esbuild": "^0.25.0",
     "jsdom": "^26.0.0",
     "postcss": "^8.5.3",

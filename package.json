@@ -1,6 +1,6 @@
 {
   "name": "dropzone-root",
-  "version": "1.0.0",
+  "version": "1.0.0-alpha.10",
   "private": true,
   "workspaces": [
     "packages/*",
@@ -11,7 +11,14 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:python": "python -m pytest backend/worker/tests -v",
-    "smoke:electron": "node scripts/smoke-test.cjs"
+    "postinstall": "node scripts/patch-electron-builder.cjs",
+    "build:worker": "python scripts/build-worker.py",
+    "build:icons": "python scripts/generate-icons.py",
+    "package:win": "node scripts/patch-electron-builder.cjs && npm run build && electron-builder --win nsis --project apps/desktop --config electron-builder.yml",
+    "package:portable": "node scripts/patch-electron-builder.cjs && npm run build && electron-builder --win portable --project apps/desktop --config electron-builder.yml",
+    "package:all": "node scripts/patch-electron-builder.cjs && npm run build && electron-builder --win --project apps/desktop --config electron-builder.yml",
+    "smoke:electron": "node scripts/smoke-test.cjs",
+    "smoke:packaged": "node scripts/smoke-test-packaged.cjs"
   },
   "overrides": {
     "rollup": "npm:@rollup/wasm-node@^4.68.2"

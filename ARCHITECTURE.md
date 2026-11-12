@@ -303,4 +303,42 @@ In asynchronous multi-process architectures (Electron Main communicating with a 
 ### 10.6 Electron Runtime Smoke Testing Harness
 - Provided `scripts/smoke-test.cjs` (`npm run smoke:electron`) which strips `ELECTRON_RUN_AS_NODE` environment overrides, boots Electron in full GUI mode, verifies database initialization, settings loading, worker handshake, and cleanly exits with code 0.
 
+---
+
+## 11. Packaging & Windows Distribution Architecture (Milestone 10)
+
+### 11.1 Release Artifact Targets
+- **NSIS Setup Installer (`DROPZONE-Setup-1.0.0-alpha.10-x64.exe`)**:
+  - Provides a standard Windows installation wizard with customizable installation directory.
+  - Automatic Start Menu shortcut creation and optional Desktop shortcut.
+  - Generates a cleanly registered uninstaller.
+  - Preserves user data (`userData/dropzone.db`) across upgrades and uninstallation (`deleteAppDataOnUninstall: false`).
+- **Portable Distribution (`DROPZONE-Portable-1.0.0-alpha.10-x64.exe`)**:
+  - Requires zero installation or administrator privileges.
+  - Self-extracts to a temporary staging location and executes in user mode.
+  - Stores application settings and history in standard user app data (`%APPDATA%/DROPZONE`), preserving state across launches without modifying protected system directories.
+
+### 11.2 Self-Contained Python Worker Bundling
+- Packaged via PyInstaller into `apps/desktop/resources/worker/dropzone-worker.exe` (29.57 MB).
+- Includes embedded Python 3.12 runtime and full package dependencies (`yt-dlp`, `gallery-dl`, `requests`, `psutil`, `pydantic`).
+- Dynamic package collection ensures all extractor plugins and CLI metadata for `yt-dlp` and `gallery-dl` are intact.
+- Standalone execution: runs without a global Python installation, virtual environment, or external dependencies.
+- Runtime Discovery in `WorkerProcess.ts`:
+  - Packaged mode (`app.isPackaged`): Resolves `path.join(process.resourcesPath, 'worker', 'dropzone-worker.exe')`.
+  - Development mode: Prefers local `resources/worker/dropzone-worker.exe` if built, with fallback to Python virtualenv/system interpreter.
+  - Production safety: Never silently falls back to a global interpreter if the packaged binary is missing; emits an actionable `WORKER_NOT_FOUND` error.
+
+### 11.3 Evidence-Based FFmpeg Distribution Policy
+- **External Dependency Architecture**:
+  - DROPZONE relies on external FFmpeg and FFprobe binaries to honor licensing obligations (GPLv3 / LGPLv3) and maintain compact installer sizes (~132 MB vs ~260+ MB).
+  - Runtime Discovery: Worker searches system `PATH`, Windows package managers (WinGet / Chocolatey / Scoop), Gyan.dev paths, and `DROPZONE_FFMPEG_PATH` environment overrides.
+  - Missing State Handling: If FFmpeg is absent, core video/audio downloads remain fully functional. Post-processing features (audio extraction, container remuxing) cleanly inform the user with actionable installation instructions.
+  - Custom Resource Override: If custom `ffmpeg.exe` and `ffprobe.exe` binaries are placed in `resources/ffmpeg/`, DROPZONE automatically discovers and utilizes them.
+
+### 11.4 Packaging Hardening & Windows Application Control (WDAC) Safety
+- Windows 11 Smart App Control (SAC) and WDAC policy enforcement blocks unsigned stub binaries generated in temporary directories during packaging.
+- Idempotent build patch (`scripts/patch-electron-builder.cjs`): configures `app-builder-lib` to utilize `UninstallerReader.exec` to parse and extract the uninstaller PE structure directly from binary buffers using Node.js without requiring unsigned executable execution.
+- Release smoke testing script (`scripts/smoke-test-packaged.cjs` / `npm run smoke:packaged`): verifies unpacked executable boot, SQLite schema creation, and standalone worker protocol handshake.
+
+
 

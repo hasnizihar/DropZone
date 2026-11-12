@@ -9,6 +9,7 @@ build/
 out/
 release/
 coverage/
+apps/desktop/resources/worker/*.exe
 
 # Python
 __pycache__/

@@ -2,6 +2,27 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.10] - 2026-11-13
+
+### Added
+- **Windows NSIS Installer (`DROPZONE-Setup-1.0.0-alpha.10-x64.exe`)**:
+  - Full installation wizard with custom destination directory selection, Start Menu shortcut, optional desktop shortcut, and uninstaller registration.
+  - Safe user data retention (`deleteAppDataOnUninstall: false`) ensuring databases, preferences, and downloaded files remain untouched across upgrades and uninstalls.
+- **Zero-Install Portable Distribution (`DROPZONE-Portable-1.0.0-alpha.10-x64.exe`)**:
+  - Single-file portable executable requiring no administrator rights, self-contained execution, and persistent SQLite settings in `%APPDATA%/DROPZONE`.
+- **Standalone Self-Contained Python Worker (`dropzone-worker.exe`)**:
+  - Bundled standalone Python 3.12 worker executable (29.57 MB) containing all dependencies (`yt-dlp`, `gallery-dl`, `requests`, `psutil`, `pydantic`), eliminating any global Python requirement on client PCs.
+- **Production Application Assets & Design Tokens**:
+  - Multi-resolution Windows application icons (`icon.ico` and `icon.png` from 16x16 to 256x256) crafted with DROPZONE brand tokens (Near Black `#121417`, Acid Lime `#D4FF5C`, Warm Off-White `#F5F3EF`, Graphite Grey `#282C35`).
+- **Evidence-Based External FFmpeg Distribution Policy**:
+  - Formalized external dependency policy for FFmpeg and FFprobe, providing runtime discovery, fallback guidance, and user resource overrides while adhering strictly to open-source licensing.
+- **Packaging Hardening & Smart App Control Support**:
+  - Added `scripts/patch-electron-builder.cjs` and `UninstallerReader.exec` handling to prevent Windows 11 Smart App Control / WDAC policy blocks during NSIS build.
+  - Added packaged smoke test harness (`scripts/smoke-test-packaged.cjs` / `npm run smoke:packaged`).
+- **Release Documentation & SHA-256 Verification**:
+  - Comprehensive third-party legal inventory (`THIRD_PARTY_NOTICES.md`).
+  - Cryptographic checksums (`release/SHA256SUMS.txt`).
+
 ## [1.0.0-alpha.9] - 2026-11-13
 
 ### Added

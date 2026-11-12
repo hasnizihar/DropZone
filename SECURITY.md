@@ -72,3 +72,10 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - SSRF & Redirect Boundary Testing: Automated regression suites verify that redirects to cloud metadata (`169.254.169.254`, `fd00:ec2::254`), private IP subnets, and loopback are blocked, and HTTPS-to-HTTP scheme downgrades are rejected.
    - Subprocess Command Safety Audit: Confirmed 0 occurrences of `shell=True`, `eval()`, or `exec()` in production code. All subprocess calls (Python worker, FFmpeg, FFprobe) pass discrete argument arrays.
    - Safe Atomic Finalization: Staging files (`.tmp`) are cleaned up immediately upon filesystem error, and final files are renamed only after full verification.
+
+11. **Release Packaging & Distribution Security (Milestone 10)**
+   - Zero Bundled Secrets: Release packages are audited to contain zero development credentials, local databases, temporary tokens, or development environment configurations.
+   - User Data Inviolability: The NSIS installer explicitly preserves user databases, preferences, and downloaded files during upgrades and uninstallation (`deleteAppDataOnUninstall: false`).
+   - Standard Non-Admin Execution: Normal application operation, downloads, and portable mode execution require standard user privileges and never write to `C:\Program Files` or system directories.
+   - Code Integrity & Smart App Control Awareness: Packaged resources and worker binaries follow Windows PE standards. Packaging scripts avoid executing unsigned intermediate binaries in untrusted directories.
+   - Third-Party License Compliance: All bundled dependencies are documented in `THIRD_PARTY_NOTICES.md` with explicit attribution and licensing terms. External FFmpeg policy prevents GPL redistribution contamination.

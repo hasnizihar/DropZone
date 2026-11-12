@@ -79,5 +79,52 @@ npm run test:python
 
 # Run Electron runtime smoke test
 npm run smoke:electron
+
+# Run Packaged application smoke test
+npm run smoke:packaged
 ```
+
+---
+
+## Windows Release & Distribution
+
+### Release Artifacts
+DROPZONE v1.0.0-alpha.10 provides two Windows distribution packages:
+1. **NSIS Installer (`DROPZONE-Setup-1.0.0-alpha.10-x64.exe`)**:
+   - Standard setup wizard with custom directory selection.
+   - Start Menu and Desktop shortcuts.
+   - Preserves user settings, SQLite database, and downloads during updates and uninstall.
+2. **Portable Executable (`DROPZONE-Portable-1.0.0-alpha.10-x64.exe`)**:
+   - Single-file zero-install executable.
+   - Requires no administrator privileges.
+   - Preserves settings and history in `%APPDATA%\DROPZONE`.
+
+### Bundled Standalone Python Worker
+DROPZONE bundles a standalone, self-contained Python worker (`dropzone-worker.exe`), which includes Python 3.12, `yt-dlp`, `gallery-dl`, `requests`, and `psutil`. Users do not need a globally installed Python runtime.
+
+### Packaging Commands
+```bash
+# Compile standalone Python worker
+npm run build:worker
+
+# Generate application icons
+npm run build:icons
+
+# Package Windows NSIS installer
+npm run package:win
+
+# Package Windows Portable executable
+npm run package:portable
+
+# Package both installer and portable packages
+npm run package:all
+```
+
+### Checksums & Verification
+Release packages can be verified using SHA-256 hashes published in `release/SHA256SUMS.txt`:
+```powershell
+Get-FileHash -Algorithm SHA256 release\DROPZONE-Setup-1.0.0-alpha.10-x64.exe
+Get-FileHash -Algorithm SHA256 release\DROPZONE-Portable-1.0.0-alpha.10-x64.exe
+```
+
 

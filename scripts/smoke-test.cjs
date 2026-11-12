@@ -46,3 +46,4 @@ child.on('close', (code) => {
     process.exit(1);
   }
 });
+

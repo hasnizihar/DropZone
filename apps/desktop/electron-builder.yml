@@ -1,0 +1,53 @@
+appId: com.dropzone.desktop
+productName: DROPZONE
+copyright: "Copyright (c) 2026 DROPZONE Contributors"
+
+directories:
+  output: ../../release
+  buildResources: resources
+
+files:
+  - dist/**/*
+  - "!dist/**/*.map"
+  - package.json
+
+extraResources:
+  - from: resources/worker
+    to: worker
+    filter:
+      - "dropzone-worker.exe"
+  - from: resources
+    to: resources
+    filter:
+      - "icon.ico"
+      - "icon.png"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+  icon: resources/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: DROPZONE
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
+  deleteAppDataOnUninstall: false
+  runAfterFinish: true
+  artifactName: "${productName}-Setup-${version}-${arch}.${ext}"
+
+portable:
+  artifactName: "${productName}-Portable-${version}-${arch}.${ext}"
+
+compression: normal
+asar: true
+

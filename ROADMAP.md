@@ -14,7 +14,7 @@
 - [x] FFmpeg Stream Merging & Audio Conversion (Milestone 7)
 - [x] Settings Persistence & History Management (Milestone 8)
 - [x] QA & Fault-Tolerance Hardening (Milestone 9)
-- [ ] Windows NSIS Installer & Portable Executable (Milestone 10)
+- [x] Windows NSIS Installer & Portable Executable (Milestone 10)
 
 ## Future Considerations (Post-1.0)
 
