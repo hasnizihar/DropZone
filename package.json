@@ -1,0 +1,21 @@
+{
+  "name": "dropzone-root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@dropzone/desktop",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:python": "python -m pytest backend/tests"
+  },
+  "overrides": {
+    "rollup": "npm:@rollup/wasm-node@^4.68.2"
+  },
+  "devDependencies": {
+    "@rollup/wasm-node": "^4.68.2"
+  }
+}

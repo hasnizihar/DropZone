@@ -1,0 +1,268 @@
+import { create } from 'zustand';
+import type {
+  DownloadJob,
+  MediaInfo,
+  AppSettings,
+  SystemEnginesReport,
+  CreateDownloadOptions,
+} from '@dropzone/shared';
+import { DEFAULT_SETTINGS } from '@dropzone/shared';
+
+export type NavigationTab =
+  | 'dashboard'
+  | 'analyzer'
+  | 'downloads'
+  | 'batch'
+  | 'history'
+  | 'settings'
+  | 'about';
+
+interface Toast {
+  id: string;
+  text: string;
+  type: 'info' | 'success' | 'error';
+}
+
+interface AppState {
+  activeTab: NavigationTab;
+  jobs: DownloadJob[];
+  analyzedMedia: MediaInfo | null;
+  isAnalyzing: boolean;
+  analyzeError: string | null;
+  systemInfo: { version: string; platform: string; engines: SystemEnginesReport } | null;
+  settings: AppSettings;
+  toast: Toast | null;
+
+  // Actions
+  setActiveTab: (tab: NavigationTab) => void;
+  setAnalyzedMedia: (media: MediaInfo | null) => void;
+  showToast: (text: string, type?: 'info' | 'success' | 'error') => void;
+  clearToast: () => void;
+  
+  // Async IPC Actions
+  init: () => Promise<void>;
+  inspectUrl: (url: string) => Promise<boolean>;
+  addJob: (options: CreateDownloadOptions) => Promise<boolean>;
+  pauseJob: (jobId: string) => Promise<void>;
+  resumeJob: (jobId: string) => Promise<void>;
+  cancelJob: (jobId: string) => Promise<void>;
+  retryJob: (jobId: string) => Promise<void>;
+  removeJob: (jobId: string, deleteFile?: boolean) => Promise<void>;
+  clearCompleted: () => Promise<void>;
+  updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  selectDownloadDirectory: () => Promise<string | null>;
+  openPath: (path: string) => Promise<boolean>;
+  openFolder: (filePath: string) => Promise<boolean>;
+  windowControl: (action: 'minimize' | 'maximize' | 'close') => void;
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
+  activeTab: 'dashboard',
+  jobs: [],
+  analyzedMedia: null,
+  isAnalyzing: false,
+  analyzeError: null,
+  systemInfo: null,
+  settings: DEFAULT_SETTINGS,
+  toast: null,
+
+  setActiveTab: (activeTab) => set({ activeTab }),
+
+  setAnalyzedMedia: (analyzedMedia) => set({ analyzedMedia, analyzeError: null }),
+
+  showToast: (text, type = 'info') => {
+    const id = Date.now().toString();
+    set({ toast: { id, text, type } });
+    setTimeout(() => {
+      if (get().toast?.id === id) {
+        set({ toast: null });
+      }
+    }, 4000);
+  },
+
+  clearToast: () => set({ toast: null }),
+
+  init: async () => {
+    if (typeof window === 'undefined' || !window.dropzone) return;
+
+    try {
+      const [sysInfo, settings, jobs] = await Promise.all([
+        window.dropzone.getSystemInfo(),
+        window.dropzone.getSettings(),
+        window.dropzone.getAllJobs(),
+      ]);
+
+      set({
+        systemInfo: sysInfo,
+        settings: settings || DEFAULT_SETTINGS,
+        jobs: jobs || [],
+      });
+
+      // Register live listeners
+      window.dropzone.onDownloadProgress((updatedJob) => {
+        set((state) => ({
+          jobs: state.jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j)),
+        }));
+      });
+
+      window.dropzone.onDownloadCompleted((completedJob) => {
+        set((state) => ({
+          jobs: state.jobs.map((j) => (j.id === completedJob.id ? completedJob : j)),
+        }));
+        get().showToast(`Finished download: ${completedJob.title}`, 'success');
+      });
+
+      window.dropzone.onDownloadFailed((failedJob) => {
+        set((state) => ({
+          jobs: state.jobs.map((j) => (j.id === failedJob.id ? failedJob : j)),
+        }));
+        get().showToast(`Download failed: ${failedJob.title}`, 'error');
+      });
+
+      window.dropzone.onEngineStatusChanged((report) => {
+        set((state) => ({
+          systemInfo: state.systemInfo ? { ...state.systemInfo, engines: report } : null,
+        }));
+      });
+    } catch (err: any) {
+      console.error('Failed to initialize desktop store:', err);
+    }
+  },
+
+  inspectUrl: async (url: string) => {
+    if (!url.trim()) return false;
+    set({ isAnalyzing: true, analyzeError: null });
+
+    try {
+      if (typeof window !== 'undefined' && window.dropzone) {
+        const res = await window.dropzone.inspectUrl(url);
+        if (res.success && res.data) {
+          set({ analyzedMedia: res.data, isAnalyzing: false });
+          return true;
+        } else {
+          set({ isAnalyzing: false, analyzeError: res.error || 'Failed to inspect URL' });
+          get().showToast(res.error || 'Failed to inspect URL', 'error');
+          return false;
+        }
+      }
+      return false;
+    } catch (err: any) {
+      set({ isAnalyzing: false, analyzeError: err.message || 'Inspection error' });
+      get().showToast(err.message || 'Inspection error', 'error');
+      return false;
+    }
+  },
+
+  addJob: async (options: CreateDownloadOptions) => {
+    try {
+      if (typeof window !== 'undefined' && window.dropzone) {
+        const res = await window.dropzone.addJob(options);
+        if (res.success && res.job) {
+          set((state) => ({ jobs: [res.job!, ...state.jobs] }));
+          get().showToast(`Added to queue: ${res.job.title}`, 'success');
+          return true;
+        }
+      }
+      return false;
+    } catch (err: any) {
+      get().showToast(err.message || 'Failed to add download', 'error');
+      return false;
+    }
+  },
+
+  pauseJob: async (jobId: string) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      await window.dropzone.pauseJob(jobId);
+      set((state) => ({
+        jobs: state.jobs.map((j) => (j.id === jobId ? { ...j, status: 'paused' } : j)),
+      }));
+    }
+  },
+
+  resumeJob: async (jobId: string) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      await window.dropzone.resumeJob(jobId);
+      set((state) => ({
+        jobs: state.jobs.map((j) => (j.id === jobId ? { ...j, status: 'downloading' } : j)),
+      }));
+    }
+  },
+
+  cancelJob: async (jobId: string) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      await window.dropzone.cancelJob(jobId);
+      set((state) => ({
+        jobs: state.jobs.map((j) => (j.id === jobId ? { ...j, status: 'cancelled' } : j)),
+      }));
+    }
+  },
+
+  retryJob: async (jobId: string) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      await window.dropzone.retryJob(jobId);
+      set((state) => ({
+        jobs: state.jobs.map((j) => (j.id === jobId ? { ...j, status: 'pending', progress: 0 } : j)),
+      }));
+    }
+  },
+
+  removeJob: async (jobId: string, deleteFile = false) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      await window.dropzone.removeJob(jobId, deleteFile);
+      set((state) => ({
+        jobs: state.jobs.filter((j) => j.id !== jobId),
+      }));
+      get().showToast('Download removed', 'info');
+    }
+  },
+
+  clearCompleted: async () => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      await window.dropzone.clearCompletedJobs();
+      set((state) => ({
+        jobs: state.jobs.filter((j) => j.status !== 'completed' && j.status !== 'cancelled'),
+      }));
+      get().showToast('Cleared completed items', 'info');
+    }
+  },
+
+  updateSettings: async (newSettings: Partial<AppSettings>) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      const updated = await window.dropzone.updateSettings(newSettings);
+      set({ settings: updated });
+      get().showToast('Settings saved', 'success');
+    }
+  },
+
+  selectDownloadDirectory: async () => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      const result = await window.dropzone.selectDirectory();
+      if (!result.canceled && result.filePaths.length > 0) {
+        const path = result.filePaths[0];
+        await get().updateSettings({ defaultDownloadDir: path });
+        return path;
+      }
+    }
+    return null;
+  },
+
+  openPath: async (targetPath: string) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      return await window.dropzone.openPath(targetPath);
+    }
+    return false;
+  },
+
+  openFolder: async (filePath: string) => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      return await window.dropzone.openContainingFolder(filePath);
+    }
+    return false;
+  },
+
+  windowControl: (action: 'minimize' | 'maximize' | 'close') => {
+    if (typeof window !== 'undefined' && window.dropzone) {
+      (window.dropzone as any).windowControl?.(action);
+    }
+  },
+}));

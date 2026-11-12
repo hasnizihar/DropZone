@@ -1,0 +1,74 @@
+import { contextBridge, ipcRenderer } from 'electron';
+import { IPC_CHANNELS } from '../ipc/channels';
+import type {
+  CreateDownloadOptions,
+  AppSettings,
+  DownloadJob,
+  SystemEnginesReport,
+} from '@dropzone/shared';
+
+const dropzoneApi = {
+  // Analyzer
+  inspectUrl: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.ANALYZER_INSPECT, url),
+
+  // Job Management
+  addJob: (options: CreateDownloadOptions) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_ADD, options),
+  pauseJob: (jobId: string) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_PAUSE, jobId),
+  resumeJob: (jobId: string) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_RESUME, jobId),
+  cancelJob: (jobId: string) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_CANCEL, jobId),
+  retryJob: (jobId: string) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_RETRY, jobId),
+  removeJob: (jobId: string, deleteFile = false) => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_REMOVE, jobId, deleteFile),
+  clearCompletedJobs: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_CLEAR_COMPLETED),
+  getAllJobs: () => ipcRenderer.invoke(IPC_CHANNELS.DOWNLOADS_GET_ALL),
+
+  // Batch
+  inspectBatch: (urls: string[]) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_INSPECT_MULTIPLE, urls),
+  startBatch: (items: CreateDownloadOptions[]) => ipcRenderer.invoke(IPC_CHANNELS.BATCH_START, items),
+
+  // System & Environment
+  getSystemInfo: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_GET_INFO),
+  selectDirectory: () => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_SELECT_DIRECTORY),
+  openPath: (path: string) => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_OPEN_PATH, path),
+  openContainingFolder: (filePath: string) => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_OPEN_FOLDER, filePath),
+  windowControl: (action: 'minimize' | 'maximize' | 'close') => ipcRenderer.invoke(IPC_CHANNELS.SYSTEM_WINDOW_CONTROL, action),
+
+  // Settings
+  getSettings: () => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_GET),
+  updateSettings: (settings: Partial<AppSettings>) => ipcRenderer.invoke(IPC_CHANNELS.SETTINGS_UPDATE, settings),
+
+  // Events (Main -> Renderer)
+  onDownloadProgress: (callback: (job: DownloadJob) => void) => {
+    const handler = (_event: any, job: DownloadJob) => callback(job);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOAD_PROGRESS, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_DOWNLOAD_PROGRESS, handler);
+    };
+  },
+
+  onDownloadCompleted: (callback: (job: DownloadJob) => void) => {
+    const handler = (_event: any, job: DownloadJob) => callback(job);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOAD_COMPLETED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_DOWNLOAD_COMPLETED, handler);
+    };
+  },
+
+  onDownloadFailed: (callback: (job: DownloadJob) => void) => {
+    const handler = (_event: any, job: DownloadJob) => callback(job);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_DOWNLOAD_FAILED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_DOWNLOAD_FAILED, handler);
+    };
+  },
+
+  onEngineStatusChanged: (callback: (report: SystemEnginesReport) => void) => {
+    const handler = (_event: any, report: SystemEnginesReport) => callback(report);
+    ipcRenderer.on(IPC_CHANNELS.EVENT_ENGINE_STATUS, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.EVENT_ENGINE_STATUS, handler);
+    };
+  },
+};
+
+// Expose protected API to renderer
+contextBridge.exposeInMainWorld('dropzone', dropzoneApi);
