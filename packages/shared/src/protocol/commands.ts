@@ -4,6 +4,8 @@ export const WORKER_COMMANDS = {
   GET_STATUS: 'get_status',
   SHUTDOWN: 'shutdown',
   ANALYZE_URL: 'analyze_url',
+  INSPECT_DIRECT_URL: 'inspect_direct_url',
+  INSPECT_GALLERY: 'inspect_gallery',
   START_DOWNLOAD: 'start_download',
   CANCEL_DOWNLOAD: 'cancel_download',
   PAUSE_DOWNLOAD: 'pause_download',
@@ -57,6 +59,7 @@ export interface ShutdownResponsePayload {
 export interface StartDownloadRequestPayload {
   jobId: string;
   url: string;
+  engine?: 'yt-dlp' | 'direct-http' | 'image-gallery' | 'image' | 'ffmpeg';
   formatId?: string;
   targetDirectory: string;
   customFilename?: string;

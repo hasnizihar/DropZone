@@ -2,7 +2,19 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
-## [1.0.0-alpha.4] - 2026-11-12
+## [1.0.0-alpha.5] - 2026-11-12
+
+### Added
+- **Direct HTTP/HTTPS Chunked Streaming Engine**: Built `DirectStreamEngine` in Python worker streaming data in 64 KB chunks without loading full files into memory, writing incrementally to temporary `.part` files.
+- **Resumable HTTP Range Requests**: Full support for HTTP `Range: bytes=START-` and `If-Range` headers with `206 Partial Content` append mode, `200 OK` safe reset on ignored ranges, and `416 Range Not Satisfiable` completed-file detection.
+- **Transfer Sidecar Metadata**: Automatically records `.part.meta.json` tracking source URL, ETag, and Last-Modified to prevent corruption across altered remote files.
+- **Image & Gallery Extraction**: Integrated `GalleryService` using `gallery_dl` with bounded results (max 50 items) and direct image inspection (`IMAGE_EXTENSIONS` and `image/*` MIME type).
+- **SSRF & DNS Rebinding Defenses**: Enhanced `UrlValidator` with pre-flight DNS resolution verification (`socket.getaddrinfo`), blocking private/loopback/link-local IPv4/IPv6 addresses, cloud metadata endpoints (`169.254.169.254`, `fd00:ec2::254`, `metadata.google.internal`), and embedded credentials.
+- **Redirect Security**: Validates all intermediate HTTP redirect targets (up to 5 hops) against SSRF rules and blocks insecure HTTPS-to-HTTP protocol downgrades.
+- **Windows File Safety**: Protected against Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) and path traversal sequences.
+- **QueueManager Gallery Integration**: Seamless parent-child job architecture for multi-asset galleries; child jobs execute independently within the authoritative FIFO concurrency scheduler (`maxConcurrentDownloads: 3`).
+- **UI & Discovery Enhancements**: Updated `AnalyzerPage` with distinct `MEDIA`, `FILE`, `IMAGE`, `GALLERY` badges, resumability indicators, image asset grid with select/deselect controls, and updated `DownloadsPage` with live Resume controls.
+- **Comprehensive Test Suite**: Added 15 new Python tests (41 total) and 3 new Vitest tests (37 total) covering chunked streaming, range resumption, pause/cancellation, SSRF defenses, and gallery scheduling.
 
 ### Added
 - **Core Downloads Execution Engine**: Implemented `DownloadService` in Python worker powered by `yt-dlp` in execution mode (`download=True`) with audio extraction post-processing (`FFmpegExtractAudio`).

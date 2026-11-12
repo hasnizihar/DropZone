@@ -91,6 +91,54 @@ export interface MediaInfo {
   playlistItemsCount?: number;
 }
 
+export interface GalleryAsset {
+  id: string;
+  index: number;
+  url: string;
+  filename: string;
+  thumbnail?: string;
+  fileSizeBytes?: number;
+  width?: number;
+  height?: number;
+  selected?: boolean;
+}
+
+export interface GalleryInfo {
+  url: string;
+  title: string;
+  source: string;
+  downloadType: 'gallery';
+  isGallery: true;
+  assetCount: number;
+  assets: GalleryAsset[];
+}
+
+export interface DirectFileInfo {
+  url: string;
+  finalUrl: string;
+  filename: string;
+  mimeType: string;
+  fileSizeBytes?: number | null;
+  estimatedFileSizeBytes?: number | null;
+  supportsResume: boolean;
+  etag?: string | null;
+  lastModified?: string | null;
+  contentDisposition?: string | null;
+  category: ContentCategory;
+  isWebpage?: boolean;
+  downloadType: 'file' | 'image';
+}
+
+export interface UnifiedAnalysisResult {
+  url: string;
+  title?: string;
+  downloadType: 'media' | 'file' | 'image' | 'gallery';
+  media?: MediaInfo;
+  fileInfo?: DirectFileInfo;
+  gallery?: GalleryInfo;
+  assets?: GalleryAsset[];
+}
+
 // ==========================================
 // 4. DOWNLOAD JOB MODEL
 // ==========================================
@@ -112,6 +160,12 @@ export interface DownloadJob {
   totalBytes: number;
   speedBytesPerSec: number;
   etaSeconds: number | null;
+  parentJobId?: string;
+  childJobIds?: string[];
+  assetCount?: number;
+  completedAssetsCount?: number;
+  mimeType?: string;
+  supportsResume?: boolean;
   error?: {
     code: string;
     message: string;
@@ -128,8 +182,11 @@ export interface CreateDownloadOptions {
   selectedFormatId?: string;
   customFilename?: string;
   category?: ContentCategory;
+  engine?: DownloadEngineType;
   extractAudio?: boolean;
   audioFormat?: 'mp3' | 'm4a' | 'wav' | 'flac';
+  parentJobId?: string;
+  assets?: GalleryAsset[];
 }
 
 // ==========================================
@@ -185,8 +242,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
 // 7. IPC CONTRACT SPECIFICATION
 // ==========================================
 export interface IpcRendererToMainApi {
-  // Analyzer (Milestone 3 with real yt-dlp worker backend)
-  inspectUrl(url: string): Promise<{ success: boolean; data?: MediaInfo; error?: string }>;
+  // Analyzer (Milestone 3 & 5 unified media, direct file, and gallery analysis)
+  inspectUrl(url: string): Promise<{
+    success: boolean;
+    data?: MediaInfo;
+    fileInfo?: DirectFileInfo;
+    gallery?: GalleryInfo;
+    error?: string;
+  }>;
   
   // Job Management
   addJob(options: CreateDownloadOptions): Promise<{ success: boolean; job?: DownloadJob; error?: string }>;

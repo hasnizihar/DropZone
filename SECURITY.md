@@ -32,8 +32,11 @@ DROPZONE enforces defense-in-depth principles across its desktop runtime:
    - Logs never record authentication tokens, cookies, or user credentials.
    - Diagnostic output is scrubbed of sensitive query parameters where applicable.
 
-6. **URL Validation & Network Security (Milestone 3)**
+6. **URL Validation & Network Security (Milestones 3 & 5)**
    - Media URLs are validated defensively prior to invocation (`UrlValidator`).
    - Allowed protocols are strictly restricted to `http` and `https` (rejecting `file:`, `data:`, `javascript:`, `ftp:`, `smb:`, etc.).
-   - Access to private network addresses, loopback interfaces (`127.0.0.1`, `localhost`, `::1`), RFC 1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), and cloud metadata services (`169.254.169.254`) is strictly blocked to prevent SSRF vulnerabilities.
-   - Media extraction operates strictly in no-download mode (`download=False`, `noplaylist=True`). DRM bypass, authentication circumvention, and credential stuffing are prohibited.
+   - Access to private network addresses, loopback interfaces (`127.0.0.1`, `localhost`, `::1`), RFC 1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), link-local IPs, and cloud metadata services (`169.254.169.254`, `fd00:ec2::254`, `metadata.google.internal`) is strictly blocked to prevent SSRF vulnerabilities.
+   - Hostnames are resolved through DNS pre-flight verification (`getaddrinfo`) to prevent DNS rebinding attacks to internal infrastructure.
+   - HTTP redirects are bounded (max 5 hops) and every intermediate location header is validated against SSRF rules; protocol downgrades (HTTPS -> HTTP) are strictly blocked.
+   - Filenames are protected against Windows reserved device names (`CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9`) and path traversal sequences.
+   - Range-based download resumption requires remote resource validation (ETag / Last-Modified sidecar checks) to prevent silent data corruption.

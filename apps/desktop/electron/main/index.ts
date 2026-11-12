@@ -187,8 +187,105 @@ function setupIpcHandlers() {
       }
 
       const response = await workerManager.analyzeUrl(url.trim(), 35000);
-      if (!response || !response.success || !response.metadata) {
-        return { success: false, error: 'Media analyzer returned empty or invalid response.' };
+      if (!response) {
+        return { success: false, error: 'Analyzer returned empty or invalid response.' };
+      }
+
+      // Handle Gallery Result
+      if (response.downloadType === 'gallery' || response.isGallery) {
+        const info: MediaInfo = {
+          url: response.url || url.trim(),
+          metadata: {
+            id: 'gallery',
+            title: response.title || 'Image Gallery',
+            extractor: response.source || 'gallery-dl',
+            platform: response.source || 'Gallery',
+            originalUrl: url.trim(),
+            webpageUrl: url.trim(),
+            mediaType: 'image',
+            isPlaylist: false,
+          },
+          formats: [],
+          extractor: {
+            name: response.source || 'Gallery',
+            key: 'gallery-dl',
+          },
+          analysisDurationMs: 0,
+          title: response.title || 'Image Gallery',
+          thumbnail: response.assets?.[0]?.thumbnail,
+          source: response.source || 'Gallery',
+          category: 'image',
+          engine: 'image-gallery',
+          isPlaylist: false,
+          playlistItemsCount: response.assetCount || response.assets?.length,
+        };
+        return { success: true, data: info, gallery: response };
+      }
+
+      // Handle Direct File Result
+      if (response.downloadType === 'file' || response.fileInfo) {
+        const fileInfo = response.fileInfo || response;
+        const info: MediaInfo = {
+          url: fileInfo.url || url.trim(),
+          metadata: {
+            id: 'direct_file',
+            title: fileInfo.filename || 'Direct Download',
+            extractor: 'direct-http',
+            platform: 'Direct HTTP',
+            originalUrl: url.trim(),
+            webpageUrl: url.trim(),
+            mediaType: 'unknown',
+            isPlaylist: false,
+          },
+          formats: [],
+          extractor: {
+            name: 'Direct HTTP',
+            key: 'direct-http',
+          },
+          analysisDurationMs: 0,
+          title: fileInfo.filename || 'Direct Download',
+          source: fileInfo.source || 'Direct HTTP',
+          category: fileInfo.category || 'file',
+          engine: 'direct-http',
+          isPlaylist: false,
+        };
+        return { success: true, data: info, fileInfo };
+      }
+
+      // Handle Direct Image Result
+      if (response.downloadType === 'image') {
+        const firstAsset = response.assets?.[0];
+        const info: MediaInfo = {
+          url: response.url || url.trim(),
+          metadata: {
+            id: 'image',
+            title: response.title || 'Direct Image',
+            extractor: 'direct-http',
+            platform: response.source || 'Direct Image',
+            originalUrl: url.trim(),
+            webpageUrl: url.trim(),
+            thumbnailUrl: firstAsset?.thumbnail || response.url,
+            mediaType: 'image',
+            isPlaylist: false,
+          },
+          formats: [],
+          extractor: {
+            name: 'Direct Image',
+            key: 'direct-http',
+          },
+          analysisDurationMs: 0,
+          title: response.title || 'Direct Image',
+          thumbnail: firstAsset?.thumbnail || response.url,
+          source: response.source || 'Direct Image',
+          category: 'image',
+          engine: 'direct-http',
+          isPlaylist: false,
+        };
+        return { success: true, data: info, gallery: response };
+      }
+
+      if (!response.metadata) {
+        return { success: false, error: 'Media analyzer returned empty metadata.' };
       }
 
       // Convert to MediaInfo format for renderer

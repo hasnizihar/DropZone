@@ -21,6 +21,8 @@ import {
   StartDownloadResponsePayload,
   CancelDownloadResponsePayload,
   PauseDownloadResponsePayload,
+  DirectFileInfo,
+  GalleryInfo,
 } from '@dropzone/shared';
 
 interface PendingRequest {
@@ -162,6 +164,22 @@ export class WorkerManager extends EventEmitter {
   public async analyzeUrl(url: string, timeoutMs = 35000): Promise<AnalyzeUrlResponsePayload> {
     return this.sendRequest<AnalyzeUrlResponsePayload>(
       WORKER_COMMANDS.ANALYZE_URL,
+      { url },
+      timeoutMs
+    );
+  }
+
+  public async inspectDirectUrl(url: string, timeoutMs = 20000): Promise<DirectFileInfo> {
+    return this.sendRequest<DirectFileInfo>(
+      WORKER_COMMANDS.INSPECT_DIRECT_URL,
+      { url },
+      timeoutMs
+    );
+  }
+
+  public async inspectGallery(url: string, timeoutMs = 30000): Promise<GalleryInfo> {
+    return this.sendRequest<GalleryInfo>(
+      WORKER_COMMANDS.INSPECT_GALLERY,
       { url },
       timeoutMs
     );

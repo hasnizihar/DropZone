@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import type {
   DownloadJob,
+  DownloadEngineType,
   CreateDownloadOptions,
   DownloadProgressEventPayload,
   DownloadCompletedEventPayload,
@@ -87,9 +88,10 @@ export class QueueManager extends EventEmitter {
       return;
     }
 
-    // Find all pending jobs, sorted chronologically (FIFO)
+    // Find all pending execution jobs, sorted chronologically (FIFO)
+    // Note: 'image-gallery' parent container jobs don't consume concurrency slots; their child assets do
     const pendingJobs = Array.from(this.jobs.values())
-      .filter((j) => j.status === 'pending')
+      .filter((j) => j.status === 'pending' && j.engine !== 'image-gallery')
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     const jobsToStart = pendingJobs.slice(0, availableSlots);
@@ -115,6 +117,7 @@ export class QueueManager extends EventEmitter {
       await this.workerManager.startDownload({
         jobId: job.id,
         url: job.url,
+        engine: job.engine,
         formatId: job.selectedFormatId,
         targetDirectory,
         customFilename: job.customFilename || job.title,
@@ -133,20 +136,79 @@ export class QueueManager extends EventEmitter {
   }
 
   public addJob(options: CreateDownloadOptions): DownloadJob {
+    if (options.assets && options.assets.length > 0) {
+      const parentId = `job_gal_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const selectedAssets = options.assets.filter((a) => a.selected !== false);
+      const parentJob: DownloadJob = {
+        id: parentId,
+        url: options.url,
+        title: options.customFilename || `Gallery (${selectedAssets.length} images)`,
+        source: options.url.split('/')[2] || 'web',
+        category: 'image',
+        engine: 'image-gallery',
+        status: 'downloading',
+        targetDirectory: options.targetDirectory || this.defaultDownloadDir,
+        progress: 0,
+        downloadedBytes: 0,
+        totalBytes: 0,
+        speedBytesPerSec: 0,
+        etaSeconds: null,
+        assetCount: selectedAssets.length,
+        completedAssetsCount: 0,
+        childJobIds: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      this.jobs.set(parentId, parentJob);
+      this.emit('job-added', parentJob);
+
+      for (const asset of selectedAssets) {
+        const childId = `job_${parentId}_${asset.index}`;
+        parentJob.childJobIds!.push(childId);
+        const childJob: DownloadJob = {
+          id: childId,
+          parentJobId: parentId,
+          url: asset.url,
+          title: asset.filename,
+          source: parentJob.source,
+          category: 'image',
+          engine: 'direct-http',
+          status: 'pending',
+          targetDirectory: parentJob.targetDirectory,
+          customFilename: asset.filename,
+          thumbnail: asset.thumbnail,
+          progress: 0,
+          downloadedBytes: 0,
+          totalBytes: asset.fileSizeBytes || 0,
+          speedBytesPerSec: 0,
+          etaSeconds: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        this.jobs.set(childId, childJob);
+        this.emit('job-added', childJob);
+      }
+      this.processQueue();
+      return parentJob;
+    }
+
     const id = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const filename = options.customFilename || options.url.split('/').pop()?.split('?')[0] || 'Download Job';
+    const isImage = options.category === 'image' || /\.(jpe?g|png|gif|webp|svg|bmp|tiff|avif)($|\?)/i.test(options.url);
+    const engine: DownloadEngineType = options.engine || (isImage ? 'direct-http' : (options.category === 'file' ? 'direct-http' : 'yt-dlp'));
 
     const newJob: DownloadJob = {
       id,
       url: options.url,
       title: filename,
-      source: 'web',
-      category: options.category || (options.extractAudio ? 'file' : 'video'),
-      engine: 'yt-dlp',
+      source: options.url.split('/')[2] || 'web',
+      category: options.category || (isImage ? 'image' : (options.extractAudio ? 'file' : 'video')),
+      engine,
       status: 'pending',
       selectedFormatId: options.selectedFormatId || 'best',
       targetDirectory: options.targetDirectory || this.defaultDownloadDir,
       customFilename: options.customFilename,
+      parentJobId: options.parentJobId,
       progress: 0,
       downloadedBytes: 0,
       totalBytes: 0,
@@ -165,6 +227,16 @@ export class QueueManager extends EventEmitter {
   public async pauseJob(jobId: string): Promise<boolean> {
     const job = this.jobs.get(jobId);
     if (!job) return false;
+
+    if (job.childJobIds && job.childJobIds.length > 0) {
+      for (const childId of job.childJobIds) {
+        await this.pauseJob(childId);
+      }
+      job.status = 'paused';
+      job.updatedAt = new Date().toISOString();
+      this.emit('job-updated', job);
+      return true;
+    }
 
     if (this.activeJobIds.has(jobId)) {
       try {
@@ -188,6 +260,19 @@ export class QueueManager extends EventEmitter {
     const job = this.jobs.get(jobId);
     if (!job) return false;
 
+    if (job.childJobIds && job.childJobIds.length > 0) {
+      for (const childId of job.childJobIds) {
+        const child = this.jobs.get(childId);
+        if (child && child.status === 'paused') {
+          await this.resumeJob(childId);
+        }
+      }
+      job.status = 'pending';
+      job.updatedAt = new Date().toISOString();
+      this.emit('job-updated', job);
+      return true;
+    }
+
     job.status = 'pending';
     job.error = undefined;
     job.updatedAt = new Date().toISOString();
@@ -199,6 +284,16 @@ export class QueueManager extends EventEmitter {
   public async cancelJob(jobId: string): Promise<boolean> {
     const job = this.jobs.get(jobId);
     if (!job) return false;
+
+    if (job.childJobIds && job.childJobIds.length > 0) {
+      for (const childId of job.childJobIds) {
+        await this.cancelJob(childId);
+      }
+      job.status = 'cancelled';
+      job.updatedAt = new Date().toISOString();
+      this.emit('job-updated', job);
+      return true;
+    }
 
     if (this.activeJobIds.has(jobId)) {
       try {
@@ -310,6 +405,15 @@ export class QueueManager extends EventEmitter {
     }
 
     this.emit('job-progress', job);
+
+    if (job.parentJobId) {
+      const parent = this.jobs.get(job.parentJobId);
+      if (parent) {
+        parent.speedBytesPerSec = payload.speedBytesPerSec;
+        parent.updatedAt = new Date().toISOString();
+        this.emit('job-progress', parent);
+      }
+    }
   }
 
   private handleWorkerCompleted(payload: DownloadCompletedEventPayload): void {
@@ -331,6 +435,24 @@ export class QueueManager extends EventEmitter {
     this.activeJobIds.delete(job.id);
     this.emit('job-completed', job);
     this.emit('job-updated', job);
+
+    if (job.parentJobId) {
+      const parent = this.jobs.get(job.parentJobId);
+      if (parent) {
+        parent.completedAssetsCount = (parent.completedAssetsCount || 0) + 1;
+        const total = parent.assetCount || 1;
+        parent.progress = Math.min(100, Math.round((parent.completedAssetsCount / total) * 100));
+        parent.downloadedBytes += (payload.totalBytes || 0);
+        if (parent.completedAssetsCount >= total) {
+          parent.status = 'completed';
+          parent.completedAt = new Date().toISOString();
+          this.emit('job-completed', parent);
+        }
+        parent.updatedAt = new Date().toISOString();
+        this.emit('job-updated', parent);
+      }
+    }
+
     this.processQueue();
   }
 
@@ -382,3 +504,4 @@ export class QueueManager extends EventEmitter {
     this.processQueue();
   }
 }
+

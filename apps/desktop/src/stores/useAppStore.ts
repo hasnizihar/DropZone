@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type {
   DownloadJob,
   MediaInfo,
+  DirectFileInfo,
+  GalleryInfo,
   AppSettings,
   SystemEnginesReport,
   CreateDownloadOptions,
@@ -28,6 +30,8 @@ interface AppState {
   activeTab: NavigationTab;
   jobs: DownloadJob[];
   analyzedMedia: MediaInfo | null;
+  analyzedFile: DirectFileInfo | null;
+  analyzedGallery: GalleryInfo | null;
   analysisStatus: AnalysisStatus;
   selectedFormatId: string | null;
   isAnalyzing: boolean;
@@ -43,6 +47,8 @@ interface AppState {
   setAnalyzedMedia: (media: MediaInfo | null) => void;
   setSelectedFormatId: (formatId: string | null) => void;
   resetAnalysis: () => void;
+  toggleGalleryAssetSelected: (index: number) => void;
+  selectAllGalleryAssets: (selected: boolean) => void;
   showToast: (text: string, type?: 'info' | 'success' | 'error') => void;
   clearToast: () => void;
   
@@ -71,6 +77,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeTab: 'dashboard',
   jobs: [],
   analyzedMedia: null,
+  analyzedFile: null,
+  analyzedGallery: null,
   analysisStatus: 'idle',
   selectedFormatId: null,
   isAnalyzing: false,
@@ -98,12 +106,42 @@ export const useAppStore = create<AppState>((set, get) => ({
   resetAnalysis: () =>
     set({
       analyzedMedia: null,
+      analyzedFile: null,
+      analyzedGallery: null,
       selectedFormatId: null,
       isAnalyzing: false,
       analysisStatus: 'idle',
       analyzeError: null,
       analysisDurationMs: null,
     }),
+
+  toggleGalleryAssetSelected: (index: number) => {
+    set((state) => {
+      if (!state.analyzedGallery) return state;
+      const updatedAssets = state.analyzedGallery.assets.map((a, i) =>
+        i === index ? { ...a, selected: a.selected === false ? true : false } : a
+      );
+      return {
+        analyzedGallery: {
+          ...state.analyzedGallery,
+          assets: updatedAssets,
+        },
+      };
+    });
+  },
+
+  selectAllGalleryAssets: (selected: boolean) => {
+    set((state) => {
+      if (!state.analyzedGallery) return state;
+      const updatedAssets = state.analyzedGallery.assets.map((a) => ({ ...a, selected }));
+      return {
+        analyzedGallery: {
+          ...state.analyzedGallery,
+          assets: updatedAssets,
+        },
+      };
+    });
+  },
 
   showToast: (text, type = 'info') => {
     const id = Date.now().toString();
@@ -243,6 +281,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           const defaultFmt = res.data.formats?.find((f) => f.isCombined) || res.data.formats?.[0];
           set({
             analyzedMedia: res.data,
+            analyzedFile: res.fileInfo || null,
+            analyzedGallery: res.gallery || null,
             selectedFormatId: defaultFmt?.formatId || null,
             isAnalyzing: false,
             analysisStatus: 'completed',

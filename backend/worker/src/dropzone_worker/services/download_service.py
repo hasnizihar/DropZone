@@ -274,3 +274,4 @@ class DownloadService:
                 self._cancellations.pop(job_id, None)
                 self._last_progress_emit.pop(job_id, None)
                 self._current_filenames.pop(job_id, None)
+

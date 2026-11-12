@@ -116,3 +116,4 @@ def test_dispatcher_download_commands(tmp_path):
     req_pause = ProtocolMessage("request", "pause_download", {"jobId": "job_sync_1"}, msg_id="r3")
     res_pause = dispatcher.dispatch(req_pause)
     assert res_pause.payload["paused"] is True
+

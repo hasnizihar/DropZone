@@ -163,3 +163,23 @@ Electron Main's `QueueManager` is the single authority for queue order, state tr
 
 ### 5.3 Progress Throttling & Stdio Safety
 Download progress callbacks inside `yt-dlp` are throttled to a maximum of 4 events per second (250ms interval) per active job. All stdout writes are guarded by an inter-thread lock, preventing interleaved JSON Lines and protecting IPC protocol integrity.
+
+---
+
+## 6. Direct HTTP Streaming & Gallery Architecture (Milestone 5)
+
+### 6.1 Direct HTTP/HTTPS Chunked Streaming Engine
+Direct file downloads stream network bytes directly to disk in bounded 64 KB chunks without loading files into memory. 
+- Files write to an active `.part` temporary file.
+- Resumption verifies remote ETag and Last-Modified using HTTP Range headers (`Range: bytes={existing_bytes}-` and `If-Range`).
+- If the server returns `206 Partial Content`, downloads resume seamlessly.
+- If the server returns `200 OK`, Range was ignored or resource modified; `.part` safely resets to byte 0.
+- If the server returns `416 Range Not Satisfiable`, the engine verifies if `.part` is already complete, or resets safely.
+- Upon completion, the `.part` file is atomically renamed via `os.replace` to the final filename.
+
+### 6.2 Gallery Extraction & Parent-Child Queue Model
+- Integrates `gallery-dl` for supported image hosts alongside direct image resource detection.
+- Extraction is bounded (default max 50 items) to prevent runaway crawling.
+- When a user downloads a gallery, `QueueManager` adds a parent container job (`engine: 'image-gallery'`) and creates child download jobs (`engine: 'direct-http'`) for each selected asset.
+- Child jobs compete fairly within the single authoritative FIFO concurrency scheduler (`maxConcurrentDownloads: 3`).
+- Parent jobs aggregate progress, completed asset count, and cancellation/pause state across child jobs.

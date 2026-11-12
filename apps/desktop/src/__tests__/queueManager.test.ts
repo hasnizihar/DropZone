@@ -162,4 +162,101 @@ describe('QueueManager State Machine & Concurrency Scheduler', () => {
     expect(count).toBe(2);
     expect(queueManager.getAllJobs().length).toBe(0);
   });
+
+  it('schedules direct-http downloads using direct stream engine', () => {
+    const job = queueManager.addJob({
+      url: 'https://example.com/archive.zip',
+      category: 'file',
+      engine: 'direct-http',
+      customFilename: 'archive.zip',
+    });
+
+    expect(job.engine).toBe('direct-http');
+    expect(job.category).toBe('file');
+    expect(job.status).toBe('downloading');
+    expect(mockWorkerManager.startDownload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        engine: 'direct-http',
+        jobId: job.id,
+      })
+    );
+  });
+
+  it('schedules image galleries as parent jobs with child asset jobs respecting concurrency', () => {
+    const parentJob = queueManager.addJob({
+      url: 'https://example.com/gallery/10',
+      category: 'image',
+      engine: 'image-gallery',
+      assets: [
+        { id: 'a1', index: 0, url: 'https://example.com/1.jpg', filename: '1.jpg', fileSizeBytes: 100 },
+        { id: 'a2', index: 1, url: 'https://example.com/2.jpg', filename: '2.jpg', fileSizeBytes: 200 },
+        { id: 'a3', index: 2, url: 'https://example.com/3.jpg', filename: '3.jpg', fileSizeBytes: 300 },
+      ],
+    });
+
+    expect(parentJob.engine).toBe('image-gallery');
+    expect(parentJob.assetCount).toBe(3);
+    expect(parentJob.childJobIds?.length).toBe(3);
+
+    const child1Id = parentJob.childJobIds![0];
+    const child2Id = parentJob.childJobIds![1];
+    const child3Id = parentJob.childJobIds![2];
+
+    const child1 = queueManager.getJob(child1Id)!;
+    const child2 = queueManager.getJob(child2Id)!;
+    const child3 = queueManager.getJob(child3Id)!;
+
+    // maxConcurrent = 2:
+    expect(child1.status).toBe('downloading');
+    expect(child2.status).toBe('downloading');
+    expect(child3.status).toBe('pending');
+
+    // Child 1 completes -> frees a slot -> Child 3 starts downloading
+    mockWorkerManager.emit('download-completed', {
+      jobId: child1Id,
+      outputPath: 'C:/Downloads/1.jpg',
+      totalBytes: 100,
+    });
+
+    expect(child1.status).toBe('completed');
+    expect(child3.status).toBe('downloading');
+    expect(parentJob.completedAssetsCount).toBe(1);
+
+    // Child 2 & Child 3 complete -> Parent completes
+    mockWorkerManager.emit('download-completed', {
+      jobId: child2Id,
+      outputPath: 'C:/Downloads/2.jpg',
+      totalBytes: 200,
+    });
+    mockWorkerManager.emit('download-completed', {
+      jobId: child3Id,
+      outputPath: 'C:/Downloads/3.jpg',
+      totalBytes: 300,
+    });
+
+    expect(parentJob.completedAssetsCount).toBe(3);
+    expect(parentJob.status).toBe('completed');
+    expect(parentJob.progress).toBe(100);
+  });
+
+  it('cancelling gallery parent cancels all child jobs', async () => {
+    const parentJob = queueManager.addJob({
+      url: 'https://example.com/gallery/cancel',
+      category: 'image',
+      engine: 'image-gallery',
+      assets: [
+        { id: 'c1', index: 0, url: 'https://example.com/c1.jpg', filename: 'c1.jpg' },
+        { id: 'c2', index: 1, url: 'https://example.com/c2.jpg', filename: 'c2.jpg' },
+      ],
+    });
+
+    const child1 = queueManager.getJob(parentJob.childJobIds![0])!;
+    const child2 = queueManager.getJob(parentJob.childJobIds![1])!;
+
+    await queueManager.cancelJob(parentJob.id);
+
+    expect(parentJob.status).toBe('cancelled');
+    expect(child1.status).toBe('cancelled');
+    expect(child2.status).toBe('cancelled');
+  });
 });

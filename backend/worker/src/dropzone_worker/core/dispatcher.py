@@ -1,6 +1,8 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional, Callable
+from urllib.parse import urlparse
+
 from ..protocol.models import (
     ProtocolMessage,
     create_response,
@@ -12,8 +14,12 @@ from ..protocol.errors import WorkerProtocolError, ProtocolErrorCode
 from ..__init__ import __version__
 from .health import WorkerHealthMonitor
 from .lifecycle import WorkerLifecycle
+from ..services.url_validator import validate_url
 from ..services.media_analyzer import MediaAnalyzerService
 from ..services.download_service import DownloadService
+from ..services.direct_http_service import DirectHttpService
+from ..services.direct_stream_engine import DirectStreamEngine
+from ..services.gallery_service import GalleryService
 
 logger = logging.getLogger("dropzone_worker")
 
@@ -24,6 +30,9 @@ class CommandDispatcher:
         lifecycle: WorkerLifecycle,
         analyzer: Optional[MediaAnalyzerService] = None,
         download_service: Optional[DownloadService] = None,
+        http_service: Optional[DirectHttpService] = None,
+        direct_stream_engine: Optional[DirectStreamEngine] = None,
+        gallery_service: Optional[GalleryService] = None,
         write_message_fn: Optional[Callable[[ProtocolMessage], None]] = None,
         max_workers: int = 4,
     ):
@@ -32,6 +41,12 @@ class CommandDispatcher:
         self.analyzer = analyzer or MediaAnalyzerService()
         self.write_message_fn = write_message_fn
         self.download_service = download_service or DownloadService(write_event_fn=self._write_event)
+        self.http_service = http_service or DirectHttpService()
+        self.direct_stream_engine = direct_stream_engine or DirectStreamEngine(
+            write_event_fn=self._write_event,
+            http_service=self.http_service,
+        )
+        self.gallery_service = gallery_service or GalleryService(http_service=self.http_service)
         self.executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="worker_task")
 
         self._handlers = {
@@ -40,6 +55,8 @@ class CommandDispatcher:
             "get_status": self._handle_get_status,
             "shutdown": self._handle_shutdown,
             "analyze_url": self._handle_analyze_url,
+            "inspect_direct_url": self._handle_inspect_direct_url,
+            "inspect_gallery": self._handle_inspect_gallery,
             "start_download": self._handle_start_download,
             "cancel_download": self._handle_cancel_download,
             "pause_download": self._handle_pause_download,
@@ -60,13 +77,11 @@ class CommandDispatcher:
                 f"Command '{request.command}' is not supported by worker"
             )
 
-        if cmd == "analyze_url" and self.write_message_fn:
-            # Execute asynchronously in thread pool to prevent blocking heartbeat
+        if cmd in ("analyze_url", "inspect_gallery", "inspect_direct_url") and self.write_message_fn:
             self._dispatch_async_analyze(request)
             return None
 
         if cmd == "start_download" and self.write_message_fn:
-            # Execute download asynchronously in thread pool to keep protocol responsive
             self._dispatch_async_download(request)
             return None
 
@@ -74,8 +89,75 @@ class CommandDispatcher:
         payload = handler(request.payload)
         return create_response(request.id, request.command, payload)
 
+    def _analyze_unified(self, url: str) -> Dict[str, Any]:
+        """Unified inspection trying direct image, gallery, yt-dlp media, or direct file."""
+        validate_url(url)
+
+        # 1. Direct image check
+        if self.gallery_service.is_image_url(url):
+            try:
+                res = self.gallery_service.extract_gallery_or_image(url)
+                res["downloadType"] = "image"
+                return res
+            except Exception:
+                pass
+
+        # 2. Supported gallery site check
+        if self.gallery_service.is_gallery_supported(url):
+            try:
+                res = self.gallery_service.extract_gallery_or_image(url)
+                res["downloadType"] = "gallery"
+                return res
+            except Exception:
+                pass
+
+        # 3. Media analysis with yt-dlp
+        media_error = None
+        try:
+            res = self.analyzer.analyze(url)
+            res["downloadType"] = "media"
+            return res
+        except Exception as exc:
+            media_error = exc
+
+        # 4. Direct HTTP fallback (e.g., zip, pdf, exe, iso, direct stream)
+        try:
+            direct_res = self.http_service.inspect_url(url)
+            if direct_res.get("category") == "image":
+                img_res = self.gallery_service.extract_gallery_or_image(url)
+                img_res["downloadType"] = "image"
+                return img_res
+
+            if not direct_res.get("isWebpage"):
+                return {
+                    "url": url,
+                    "title": direct_res["filename"],
+                    "source": urlparse(url).netloc,
+                    "downloadType": "file",
+                    "fileInfo": direct_res,
+                    "metadata": {
+                        "id": "direct_file",
+                        "title": direct_res["filename"],
+                        "extractor": "direct-http",
+                        "extractorKey": "DirectHttp",
+                    },
+                    "formats": [],
+                }
+        except Exception:
+            pass
+
+        # If everything failed, raise original media error or unsupported error
+        if media_error:
+            raise media_error
+
+        raise WorkerProtocolError(
+            ProtocolErrorCode.UNSUPPORTED_URL,
+            f"No downloadable media, gallery, or direct file found at '{url}'."
+        )
+
     def _dispatch_async_analyze(self, request: ProtocolMessage):
         url = request.payload.get("url")
+        cmd = request.command.lower()
 
         def _worker_task():
             self._safe_write(
@@ -83,7 +165,14 @@ class CommandDispatcher:
             )
 
             try:
-                result = self.analyzer.analyze(url)
+                if cmd == "inspect_direct_url":
+                    result = self.http_service.inspect_url(url)
+                    result["downloadType"] = "file"
+                elif cmd == "inspect_gallery":
+                    result = self.gallery_service.extract_gallery_or_image(url)
+                else:
+                    result = self._analyze_unified(url)
+
                 self._safe_write(
                     create_response(request.id, request.command, result)
                 )
@@ -93,35 +182,34 @@ class CommandDispatcher:
                         {
                             "url": url,
                             "requestId": request.id,
-                            "title": result["metadata"]["title"],
-                            "formatsCount": len(result["formats"]),
+                            "downloadType": result.get("downloadType", "media"),
+                            "title": result.get("title") or (result.get("metadata") or {}).get("title"),
                         },
                     )
                 )
-            except WorkerProtocolError as proto_err:
+            except WorkerProtocolError as err:
                 self.health.record_error()
-                logger.warning(f"Analysis failed for {url} [{proto_err.code}]: {proto_err.message}")
                 self._safe_write(
                     create_error(
-                        request_id=request.id,
-                        code=proto_err.code,
-                        message=proto_err.message,
-                        details=proto_err.details,
+                        request.id,
+                        err.code,
+                        err.message,
+                        err.details,
                         command=request.command,
                     )
                 )
                 self._safe_write(
                     create_event(
                         "analysis.failed",
-                        {"url": url, "requestId": request.id, "error": proto_err.message, "code": proto_err.code},
+                        {"url": url, "requestId": request.id, "error": err.message, "code": err.code},
                     )
                 )
             except Exception as unhandled_err:
                 self.health.record_error()
-                logger.error(f"Unexpected error in async analyzer for {url}: {unhandled_err}", exc_info=True)
+                logger.error(f"Unexpected error analyzing URL '{url}': {unhandled_err}", exc_info=True)
                 self._safe_write(
                     create_error(
-                        request_id=request.id,
+                        request.id,
                         code=ProtocolErrorCode.INTERNAL_ERROR,
                         message=f"Analysis failed: {unhandled_err}",
                         command=request.command,
@@ -145,18 +233,27 @@ class CommandDispatcher:
         custom_filename = payload.get("customFilename")
         extract_audio = bool(payload.get("extractAudio", False))
         audio_format = payload.get("audioFormat", "mp3")
+        engine = payload.get("engine", "yt-dlp")
 
         def _download_task():
             try:
-                res = self.download_service.execute_download(
-                    job_id=job_id,
-                    url=url,
-                    target_directory=target_dir,
-                    format_id=format_id,
-                    custom_filename=custom_filename,
-                    extract_audio=extract_audio,
-                    audio_format=audio_format,
-                )
+                if engine in ("direct-http", "image"):
+                    res = self.direct_stream_engine.execute_download(
+                        job_id=job_id,
+                        url=url,
+                        target_directory=target_dir,
+                        custom_filename=custom_filename,
+                    )
+                else:
+                    res = self.download_service.execute_download(
+                        job_id=job_id,
+                        url=url,
+                        target_directory=target_dir,
+                        format_id=format_id,
+                        custom_filename=custom_filename,
+                        extract_audio=extract_audio,
+                        audio_format=audio_format,
+                    )
                 self._safe_write(create_response(request.id, request.command, res))
             except WorkerProtocolError as err:
                 self.health.record_error()
@@ -193,6 +290,8 @@ class CommandDispatcher:
                 "get_status",
                 "shutdown",
                 "analyze_url",
+                "inspect_direct_url",
+                "inspect_gallery",
                 "start_download",
                 "cancel_download",
                 "pause_download",
@@ -211,7 +310,14 @@ class CommandDispatcher:
     def _handle_get_status(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         status_info = self.health.get_status_payload()
         status_info["ytdlpVersion"] = self.analyzer.engine.version
-        for cap in ["analyze_url", "start_download", "cancel_download", "pause_download"]:
+        for cap in [
+            "analyze_url",
+            "inspect_direct_url",
+            "inspect_gallery",
+            "start_download",
+            "cancel_download",
+            "pause_download",
+        ]:
             if cap not in status_info["capabilities"]:
                 status_info["capabilities"].append(cap)
         return status_info
@@ -227,9 +333,25 @@ class CommandDispatcher:
 
     def _handle_analyze_url(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = payload.get("url")
-        return self.analyzer.analyze(url)
+        return self._analyze_unified(url)
+
+    def _handle_inspect_direct_url(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = payload.get("url")
+        return self.http_service.inspect_url(url)
+
+    def _handle_inspect_gallery(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = payload.get("url")
+        return self.gallery_service.extract_gallery_or_image(url)
 
     def _handle_start_download(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        engine = payload.get("engine", "yt-dlp")
+        if engine in ("direct-http", "image"):
+            return self.direct_stream_engine.execute_download(
+                job_id=payload.get("jobId"),
+                url=payload.get("url"),
+                target_directory=payload.get("targetDirectory"),
+                custom_filename=payload.get("customFilename"),
+            )
         return self.download_service.execute_download(
             job_id=payload.get("jobId"),
             url=payload.get("url"),
@@ -244,12 +366,12 @@ class CommandDispatcher:
         job_id = payload.get("jobId")
         if not job_id:
             raise WorkerProtocolError(ProtocolErrorCode.VALIDATION_ERROR, "Missing 'jobId' in cancel_download request")
-        cancelled = self.download_service.cancel_download(job_id)
+        cancelled = self.direct_stream_engine.cancel_download(job_id) or self.download_service.cancel_download(job_id)
         return {"jobId": job_id, "cancelled": cancelled, "success": cancelled}
 
     def _handle_pause_download(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         job_id = payload.get("jobId")
         if not job_id:
             raise WorkerProtocolError(ProtocolErrorCode.VALIDATION_ERROR, "Missing 'jobId' in pause_download request")
-        paused = self.download_service.pause_download(job_id)
+        paused = self.direct_stream_engine.pause_download(job_id) or self.download_service.pause_download(job_id)
         return {"jobId": job_id, "paused": paused, "success": paused}

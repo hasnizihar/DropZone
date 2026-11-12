@@ -57,12 +57,18 @@ This document tracks progress through the 10 core milestones defined in the DROP
 ---
 
 ## Milestone 5: Direct Files & Image Downloader
-- **Status:** Pending
+- **Status:** Complete
 - **Scope:**
-  - Direct HTTP/HTTPS streaming engine using chunked transfer.
-  - HTTP Range header support for safe resume.
-  - Filename and MIME-type detection.
-  - Single and bulk image extraction / gallery handling.
+  - Direct HTTP/HTTPS streaming engine using chunked transfer (64 KB chunks).
+  - HTTP Range header support (`bytes=START-`) and `If-Range` validation for safe resume into `.part` files.
+  - Sidecar `.part.meta.json` transfer metadata verification to prevent corruption across modified resources.
+  - Comprehensive filename extraction (RFC 6266 / RFC 5987 UTF-8 `filename*`, path fallback, MIME fallback) and Windows reserved name protection.
+  - SSRF protection: loopback, private IPv4/IPv6, link-local, cloud metadata IP, and DNS rebinding protection via `getaddrinfo`.
+  - Secure redirect validation preventing loops, protocol downgrades, and redirect-based SSRF.
+  - Single and bulk image extraction / gallery handling via `gallery-dl` with bounded extraction limits (max 50 items).
+  - Authoritative QueueManager integration: gallery parent jobs manage child asset jobs under the single concurrency limit (FIFO, max slots: 3).
+  - Real-time pause/resume/cancel controls and UI badges (`MEDIA`, `FILE`, `IMAGE`, `GALLERY`) in `AnalyzerPage` and `DownloadsPage`.
+  - Verified acceptance: 41/41 Pytest tests passing, 37/37 Vitest tests passing across 7 suites, zero TypeScript errors (`tsc --noEmit`), and clean production build.
 
 ---
 

@@ -26,11 +26,19 @@ export interface AnalyzeUrlRequestPayload {
 }
 
 export interface AnalyzeUrlResponsePayload {
-  success: boolean;
-  metadata: MediaMetadata;
-  formats: MediaFormat[];
-  extractor: ExtractorInfo;
-  analysisDurationMs: number;
+  success?: boolean;
+  metadata?: MediaMetadata;
+  formats?: MediaFormat[];
+  extractor?: ExtractorInfo;
+  analysisDurationMs?: number;
+  downloadType?: 'media' | 'file' | 'image' | 'gallery';
+  isGallery?: boolean;
+  title?: string;
+  url?: string;
+  source?: string;
+  assets?: any[];
+  assetCount?: number;
+  fileInfo?: any;
 }
 
 export const ExtractorInfoSchema = z.object({

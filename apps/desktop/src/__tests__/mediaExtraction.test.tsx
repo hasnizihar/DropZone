@@ -179,7 +179,7 @@ describe('WorkerManager URL Analyzer Dispatch', () => {
       10000
     );
     expect(result.success).toBe(true);
-    expect(result.metadata.title).toBe('Mock Video');
+    expect(result.metadata?.title).toBe('Mock Video');
   });
 });
 

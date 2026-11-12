@@ -19,6 +19,12 @@ import {
   Sparkles,
   Layers,
   CheckCircle2,
+  FileText,
+  Image as ImageIcon,
+  CheckSquare,
+  Square,
+  ShieldCheck,
+  HelpCircle,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import type { MediaFormat } from '@dropzone/shared';
@@ -42,6 +48,10 @@ type FormatFilter = 'all' | 'combined' | 'video' | 'audio';
 
 export const AnalyzerPage: React.FC = () => {
   const analyzedMedia = useAppStore((state) => state.analyzedMedia);
+  const analyzedFile = useAppStore((state) => state.analyzedFile);
+  const analyzedGallery = useAppStore((state) => state.analyzedGallery);
+  const toggleGalleryAssetSelected = useAppStore((state) => state.toggleGalleryAssetSelected);
+  const selectAllGalleryAssets = useAppStore((state) => state.selectAllGalleryAssets);
   const analysisStatus = useAppStore((state) => state.analysisStatus);
   const selectedFormatId = useAppStore((state) => state.selectedFormatId);
   const setSelectedFormatId = useAppStore((state) => state.setSelectedFormatId);
@@ -90,6 +100,46 @@ export const AnalyzerPage: React.FC = () => {
 
   const handleStartDownload = async (action: 'start' | 'queue') => {
     if (!analyzedMedia) return;
+
+    // Gallery download
+    if (analyzedGallery && analyzedGallery.assets.length > 0) {
+      const selectedAssets = analyzedGallery.assets.filter((a) => a.selected !== false);
+      if (selectedAssets.length === 0) {
+        showToast('Please select at least one image to download.', 'error');
+        return;
+      }
+      const ok = await addJob({
+        url: analyzedMedia.url,
+        customFilename: customFilename.trim() || analyzedGallery.title,
+        targetDirectory: targetDir || settings.defaultDownloadDir,
+        category: 'image',
+        engine: 'image-gallery',
+        assets: selectedAssets,
+      });
+      if (ok) {
+        showToast(action === 'start' ? 'Gallery download started!' : 'Gallery added to download queue', 'success');
+        setActiveTab('downloads');
+      }
+      return;
+    }
+
+    // Direct File download
+    if (analyzedFile) {
+      const ok = await addJob({
+        url: analyzedFile.url,
+        customFilename: customFilename.trim() || analyzedFile.filename,
+        targetDirectory: targetDir || settings.defaultDownloadDir,
+        category: analyzedFile.category,
+        engine: 'direct-http',
+      });
+      if (ok) {
+        showToast(action === 'start' ? 'Direct download started!' : 'Added to download queue', 'success');
+        setActiveTab('downloads');
+      }
+      return;
+    }
+
+    // Standard media download
     const isAudio = analyzedMedia.metadata?.mediaType === 'audio' || selectedFormat?.isAudio;
     const ok = await addJob({
       url: analyzedMedia.url,
@@ -97,6 +147,7 @@ export const AnalyzerPage: React.FC = () => {
       customFilename: customFilename.trim() || analyzedMedia.title,
       targetDirectory: targetDir || settings.defaultDownloadDir,
       category: isAudio ? 'file' : analyzedMedia.category,
+      engine: 'yt-dlp',
     });
     if (ok) {
       showToast(action === 'start' ? 'Download started!' : 'Added to download queue', 'success');
@@ -115,6 +166,10 @@ export const AnalyzerPage: React.FC = () => {
   const selectedFormat = allFormats.find((f) => f.formatId === selectedFormatId) || allFormats[0];
   const metadata = analyzedMedia?.metadata;
 
+  const isGalleryType = Boolean(analyzedGallery || analyzedMedia?.engine === 'image-gallery');
+  const isDirectFileType = Boolean(analyzedFile || (analyzedMedia?.engine === 'direct-http' && analyzedMedia?.category !== 'image'));
+  const isDirectImageType = Boolean(!analyzedGallery && (analyzedMedia?.category === 'image' || analyzedFile?.category === 'image'));
+
   return (
     <div className="p-8 space-y-6 max-w-6xl mx-auto">
       {/* Search Header */}
@@ -132,7 +187,7 @@ export const AnalyzerPage: React.FC = () => {
           )}
         </div>
         <p className="text-xs text-brand-grey mb-4">
-          Deep inspect video streams, audio codecs, containers, exact vs estimated sizes using Python yt-dlp.
+          Inspect and download video/audio streams (yt-dlp), direct files (chunked HTTP streaming with resume), and image galleries (gallery-dl).
         </p>
 
         <form onSubmit={handleInspect} className="flex gap-3">
@@ -144,7 +199,7 @@ export const AnalyzerPage: React.FC = () => {
               type="text"
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="Paste media link (e.g. YouTube, Vimeo, Reddit, direct HTTP)..."
+              placeholder="Paste any link (YouTube, Vimeo, Reddit, direct HTTP file, image, or gallery)..."
               disabled={isAnalyzing}
               className="w-full bg-brand-black border border-brand-border rounded-lg pl-10 pr-10 py-3 text-sm text-brand-white placeholder-brand-grey focus:outline-none focus:border-brand-lime transition-colors disabled:opacity-50"
             />
@@ -185,7 +240,7 @@ export const AnalyzerPage: React.FC = () => {
           <div className="mt-4 p-3.5 bg-red-950/40 border border-red-500/40 rounded-lg flex items-start space-x-3 text-red-300 text-xs animate-in fade-in">
             <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
             <div className="space-y-1">
-              <div className="font-semibold text-red-200">Extraction Error</div>
+              <div className="font-semibold text-red-200">Inspection Error</div>
               <p className="leading-relaxed opacity-90">{analyzeError}</p>
             </div>
           </div>
@@ -195,7 +250,7 @@ export const AnalyzerPage: React.FC = () => {
       {/* Analysis Result Card */}
       {analyzedMedia ? (
         <div className="bg-brand-surface border border-brand-border rounded-xl p-6 space-y-6">
-          {/* Media Header & Metadata */}
+          {/* Header & Badges */}
           <div className="flex flex-col md:flex-row gap-6 items-start">
             {analyzedMedia.thumbnail ? (
               <img
@@ -205,24 +260,41 @@ export const AnalyzerPage: React.FC = () => {
               />
             ) : (
               <div className="w-full md:w-64 h-40 bg-brand-black rounded-lg border border-brand-border flex items-center justify-center text-brand-grey flex-shrink-0">
-                <Video className="w-12 h-12 opacity-30 text-brand-lime" />
+                {isGalleryType ? (
+                  <ImageIcon className="w-12 h-12 opacity-30 text-brand-lime" />
+                ) : isDirectFileType ? (
+                  <FileText className="w-12 h-12 opacity-30 text-brand-lime" />
+                ) : (
+                  <Video className="w-12 h-12 opacity-30 text-brand-lime" />
+                )}
               </div>
             )}
 
             <div className="flex-1 space-y-3 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
+                {/* Primary Type Badge */}
+                <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded bg-brand-lime text-brand-black font-extrabold shadow-sm">
+                  {isGalleryType ? 'GALLERY' : isDirectImageType ? 'IMAGE' : isDirectFileType ? 'FILE' : 'MEDIA'}
+                </span>
+
                 <span className="text-[10px] uppercase font-mono px-2.5 py-0.5 rounded bg-brand-lime/10 text-brand-lime border border-brand-lime/20 font-bold">
                   {metadata?.platform || analyzedMedia.source}
                 </span>
+
                 <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-brand-black text-brand-grey border border-brand-border">
-                  Extractor: {metadata?.extractor || analyzedMedia.extractor?.key || 'yt-dlp'}
+                  Engine: {analyzedMedia.engine}
                 </span>
-                <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-brand-black text-brand-grey border border-brand-border">
-                  Type: {metadata?.mediaType || analyzedMedia.category}
-                </span>
-                {metadata?.isPlaylist && (
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
-                    Playlist {metadata.playlistCount ? `(${metadata.playlistCount} items)` : ''}
+
+                {analyzedFile?.supportsResume && (
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold flex items-center space-x-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>Resumable (Range 206)</span>
+                  </span>
+                )}
+
+                {analyzedFile?.fileSizeBytes && (
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-brand-black text-brand-white border border-brand-border font-bold">
+                    {formatBytes(analyzedFile.fileSizeBytes)}
                   </span>
                 )}
               </div>
@@ -233,53 +305,23 @@ export const AnalyzerPage: React.FC = () => {
 
               {/* Statistics & Metadata Row */}
               <div className="flex flex-wrap items-center gap-4 text-xs text-brand-grey">
+                {analyzedFile?.mimeType && (
+                  <span className="font-mono text-brand-lime">
+                    MIME: {analyzedFile.mimeType}
+                  </span>
+                )}
+
                 {metadata?.uploader && (
                   <div className="flex items-center space-x-1.5 text-brand-white">
                     <span>by</span>
-                    {metadata.uploaderUrl ? (
-                      <a
-                        href={metadata.uploaderUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-brand-lime hover:underline font-semibold flex items-center space-x-1"
-                      >
-                        <span>{metadata.uploader}</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="font-semibold text-brand-white">{metadata.uploader}</span>
-                    )}
+                    <span className="font-semibold text-brand-white">{metadata.uploader}</span>
                   </div>
                 )}
 
                 {(metadata?.durationFormatted || analyzedMedia.duration) && (
                   <div className="flex items-center space-x-1">
                     <Clock className="w-3.5 h-3.5 text-brand-lime" />
-                    <span>
-                      {metadata?.durationFormatted ||
-                        `${Math.floor((analyzedMedia.duration || 0) / 60)}m ${(analyzedMedia.duration || 0) % 60}s`}
-                    </span>
-                  </div>
-                )}
-
-                {metadata?.uploadDate && (
-                  <div className="flex items-center space-x-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>{metadata.uploadDate}</span>
-                  </div>
-                )}
-
-                {metadata?.viewCount !== undefined && metadata?.viewCount !== null && (
-                  <div className="flex items-center space-x-1">
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>{formatCount(metadata.viewCount)} views</span>
-                  </div>
-                )}
-
-                {metadata?.likeCount !== undefined && metadata?.likeCount !== null && (
-                  <div className="flex items-center space-x-1">
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                    <span>{formatCount(metadata.likeCount)} likes</span>
+                    <span>{metadata?.durationFormatted}</span>
                   </div>
                 )}
               </div>
@@ -290,62 +332,126 @@ export const AnalyzerPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Format Discovery & Quality Selection */}
-          <div className="border-t border-brand-border pt-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-bold uppercase tracking-wider text-brand-white flex items-center space-x-2">
-                  <Layers className="w-4 h-4 text-brand-lime" />
-                  <span>Available Formats & Streams</span>
-                  <span className="text-xs font-mono font-normal text-brand-grey">
-                    ({allFormats.length} discovered)
-                  </span>
-                </h4>
-                <p className="text-xs text-brand-grey mt-0.5">
-                  Select a stream to configure resolution, container, and codec specifications.
-                </p>
+          {/* GALLERY CONTENT: Multi-Asset Grid with Selection Controls */}
+          {isGalleryType && analyzedGallery && (
+            <div className="border-t border-brand-border pt-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-brand-white flex items-center space-x-2">
+                    <ImageIcon className="w-4 h-4 text-brand-lime" />
+                    <span>Gallery Images ({analyzedGallery.assets.length})</span>
+                  </h4>
+                  <p className="text-xs text-brand-grey mt-0.5">
+                    Select images to download through the unified queue.
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => selectAllGalleryAssets(true)}
+                    className="px-2.5 py-1 text-xs bg-brand-black border border-brand-border rounded text-brand-lime hover:text-brand-white transition-colors"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={() => selectAllGalleryAssets(false)}
+                    className="px-2.5 py-1 text-xs bg-brand-black border border-brand-border rounded text-brand-grey hover:text-brand-white transition-colors"
+                  >
+                    Deselect All
+                  </button>
+                </div>
               </div>
 
-              {/* Filter Tabs */}
-              <div className="flex items-center bg-brand-black p-1 rounded-lg border border-brand-border self-start sm:self-auto">
-                {(
-                  [
-                    { id: 'all', label: 'All', count: allFormats.length },
-                    {
-                      id: 'combined',
-                      label: 'Combined',
-                      count: allFormats.filter((f) => f.isCombined).length,
-                    },
-                    {
-                      id: 'video',
-                      label: 'Video',
-                      count: allFormats.filter((f) => f.isVideo).length,
-                    },
-                    {
-                      id: 'audio',
-                      label: 'Audio',
-                      count: allFormats.filter((f) => f.isAudio).length,
-                    },
-                  ] as const
-                ).map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setFormatFilter(tab.id)}
-                    className={`px-3 py-1 rounded text-xs font-semibold transition-all flex items-center space-x-1.5 ${
-                      formatFilter === tab.id
-                        ? 'bg-brand-surface text-brand-lime shadow-sm'
-                        : 'text-brand-grey hover:text-brand-white'
-                    }`}
-                  >
-                    <span>{tab.label}</span>
-                    <span className="text-[10px] opacity-70">({tab.count})</span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-96 overflow-y-auto pr-1">
+                {analyzedGallery.assets.map((asset, idx) => {
+                  const isSelected = asset.selected !== false;
+                  return (
+                    <div
+                      key={asset.id}
+                      onClick={() => toggleGalleryAssetSelected(idx)}
+                      className={`relative group rounded-lg border overflow-hidden cursor-pointer transition-all ${
+                        isSelected
+                          ? 'border-brand-lime ring-1 ring-brand-lime bg-brand-lime/5'
+                          : 'border-brand-border bg-brand-black/40 opacity-50'
+                      }`}
+                    >
+                      <img
+                        src={asset.thumbnail || asset.url}
+                        alt={asset.filename}
+                        className="w-full h-28 object-cover bg-brand-black"
+                      />
+                      <div className="p-2 text-[10px] font-mono text-brand-grey truncate">
+                        {asset.filename}
+                      </div>
+                      <div className="absolute top-1.5 right-1.5 bg-brand-black/80 rounded p-1">
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-brand-lime" />
+                        ) : (
+                          <Square className="w-4 h-4 text-brand-grey" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+          )}
 
-            {/* Formats Grid / Table */}
-            {filteredFormats.length > 0 ? (
+          {/* STREAM FORMATS (for Video / Audio yt-dlp) */}
+          {!isGalleryType && !isDirectFileType && !isDirectImageType && allFormats.length > 0 && (
+            <div className="border-t border-brand-border pt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold uppercase tracking-wider text-brand-white flex items-center space-x-2">
+                    <Layers className="w-4 h-4 text-brand-lime" />
+                    <span>Available Formats & Streams</span>
+                    <span className="text-xs font-mono font-normal text-brand-grey">
+                      ({allFormats.length} discovered)
+                    </span>
+                  </h4>
+                  <p className="text-xs text-brand-grey mt-0.5">
+                    Select a stream to configure resolution, container, and codec specifications.
+                  </p>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex items-center bg-brand-black p-1 rounded-lg border border-brand-border self-start sm:self-auto">
+                  {(
+                    [
+                      { id: 'all', label: 'All', count: allFormats.length },
+                      {
+                        id: 'combined',
+                        label: 'Combined',
+                        count: allFormats.filter((f) => f.isCombined).length,
+                      },
+                      {
+                        id: 'video',
+                        label: 'Video',
+                        count: allFormats.filter((f) => f.isVideo).length,
+                      },
+                      {
+                        id: 'audio',
+                        label: 'Audio',
+                        count: allFormats.filter((f) => f.isAudio).length,
+                      },
+                    ] as const
+                  ).map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setFormatFilter(tab.id)}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-all flex items-center space-x-1.5 ${
+                        formatFilter === tab.id
+                          ? 'bg-brand-surface text-brand-lime shadow-sm'
+                          : 'text-brand-grey hover:text-brand-white'
+                      }`}
+                    >
+                      <span>{tab.label}</span>
+                      <span className="text-[10px] opacity-70">({tab.count})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Formats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto pr-1">
                 {filteredFormats.map((fmt) => {
                   const isSelected = selectedFormatId === fmt.formatId;
@@ -371,22 +477,9 @@ export const AnalyzerPage: React.FC = () => {
                                 Video+Audio
                               </span>
                             )}
-                            {fmt.isVideo && (
-                              <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                                Video Only
-                              </span>
-                            )}
-                            {fmt.isAudio && (
-                              <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                                Audio Only
-                              </span>
-                            )}
                           </div>
                           <div className="text-[11px] font-mono text-brand-grey">
                             ID: {fmt.formatId} • {fmt.extension.toUpperCase()}
-                            {fmt.container && fmt.container !== fmt.extension
-                              ? ` (${fmt.container})`
-                              : ''}
                           </div>
                         </div>
 
@@ -397,26 +490,12 @@ export const AnalyzerPage: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Codecs & Size info */}
                       <div className="text-[11px] space-y-1 pt-1 border-t border-brand-border/40 font-mono">
-                        <div className="flex justify-between text-brand-grey">
-                          <span>Video: {fmt.videoCodec || 'None'}</span>
-                          <span>Audio: {fmt.audioCodec || 'None'}</span>
-                        </div>
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-brand-grey">
-                            {fmt.resolution ? fmt.resolution : fmt.isAudio ? 'Audio Stream' : ''}
-                            {fmt.fps && fmt.fps > 0 ? ` @ ${Math.round(fmt.fps)}fps` : ''}
+                            {fmt.resolution || (fmt.isAudio ? 'Audio Stream' : '')}
                           </span>
-                          <span
-                            className={`font-semibold ${
-                              hasExactSize
-                                ? 'text-brand-white'
-                                : hasApproxSize
-                                ? 'text-brand-lime'
-                                : 'text-brand-grey'
-                            }`}
-                          >
+                          <span className="font-semibold text-brand-white">
                             {hasExactSize
                               ? formatBytes(fmt.fileSizeBytes)
                               : hasApproxSize
@@ -429,53 +508,49 @@ export const AnalyzerPage: React.FC = () => {
                   );
                 })}
               </div>
-            ) : (
-              <div className="py-8 text-center bg-brand-black/40 rounded-lg border border-brand-border text-brand-grey text-xs">
-                No formats found for the filter "{formatFilter}".
-              </div>
-            )}
-
-            {/* Destination folder */}
-            <div className="space-y-2 pt-2 border-t border-brand-border">
-              <label className="text-xs font-semibold text-brand-grey">Destination Directory</label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={targetDir || settings.defaultDownloadDir}
-                  onChange={(e) => setTargetDir(e.target.value)}
-                  className="flex-1 bg-brand-black border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-white font-mono"
-                />
-                <button
-                  onClick={handleSelectFolder}
-                  className="px-4 py-2 bg-brand-surface border border-brand-border rounded-lg text-xs text-brand-white hover:bg-brand-black flex items-center space-x-1.5 transition-colors"
-                >
-                  <Folder className="w-3.5 h-3.5" />
-                  <span>Browse</span>
-                </button>
-              </div>
             </div>
+          )}
 
-            {/* Action Buttons & Milestone Notice */}
-            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+          {/* Destination Folder Selector */}
+          <div className="space-y-2 pt-2 border-t border-brand-border">
+            <label className="text-xs font-semibold text-brand-grey">Destination Directory</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={targetDir || settings.defaultDownloadDir}
+                onChange={(e) => setTargetDir(e.target.value)}
+                className="flex-1 bg-brand-black border border-brand-border rounded-lg px-3 py-2 text-xs text-brand-white font-mono"
+              />
               <button
-                onClick={() => handleStartDownload('start')}
-                className="flex-1 py-3 bg-brand-lime text-brand-black font-bold rounded-lg text-sm hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 shadow-sm"
+                onClick={handleSelectFolder}
+                className="px-4 py-2 bg-brand-surface border border-brand-border rounded-lg text-xs text-brand-white hover:bg-brand-black flex items-center space-x-1.5 transition-colors"
               >
-                <Download className="w-4 h-4" />
-                <span>Start Download</span>
-              </button>
-              <button
-                onClick={() => handleStartDownload('queue')}
-                className="px-6 py-3 bg-brand-surface border border-brand-border text-brand-white font-semibold rounded-lg text-sm hover:bg-brand-black transition-colors flex items-center justify-center space-x-2"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add to Queue</span>
+                <Folder className="w-3.5 h-3.5" />
+                <span>Browse</span>
               </button>
             </div>
+          </div>
 
-            <div className="text-[11px] text-brand-grey/80 text-center pt-1 font-mono">
-              Milestone 4 active: Download queue state machine & concurrent scheduler connected to Python worker.
-            </div>
+          {/* Action Buttons */}
+          <div className="pt-2 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => handleStartDownload('start')}
+              className="flex-1 py-3 bg-brand-lime text-brand-black font-bold rounded-lg text-sm hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 shadow-sm"
+            >
+              <Download className="w-4 h-4" />
+              <span>
+                {isGalleryType
+                  ? `Download Selected (${analyzedGallery?.assets.filter((a) => a.selected !== false).length || 0} images)`
+                  : 'Start Download'}
+              </span>
+            </button>
+            <button
+              onClick={() => handleStartDownload('queue')}
+              className="px-6 py-3 bg-brand-surface border border-brand-border text-brand-white font-semibold rounded-lg text-sm hover:bg-brand-black transition-colors flex items-center justify-center space-x-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add to Queue</span>
+            </button>
           </div>
         </div>
       ) : (
@@ -483,7 +558,7 @@ export const AnalyzerPage: React.FC = () => {
           <Search className="w-10 h-10 text-brand-grey mx-auto mb-3 opacity-40" />
           <h3 className="text-sm font-semibold text-brand-white mb-1">No Active URL Inspected</h3>
           <p className="text-xs text-brand-grey max-w-sm mx-auto">
-            Paste a video, audio, or media link above to inspect metadata, formats, streams, and codecs.
+            Paste a link above to inspect streaming media, direct downloadable files, images, or galleries.
           </p>
         </div>
       )}
