@@ -11,6 +11,8 @@ from .direct_http_service import (
     DirectHttpService,
     sanitize_filename,
     parse_content_disposition_filename,
+    parse_retry_after,
+    parse_content_range,
 )
 from ..protocol.errors import WorkerProtocolError, ProtocolErrorCode
 
@@ -78,13 +80,73 @@ class DirectStreamEngine:
         target_dir = os.path.abspath(target_directory)
         os.makedirs(target_dir, exist_ok=True)
 
-        # 1. Inspect URL metadata first
-        inspect_res = self.http_service.inspect_url(url, check_dns=check_dns, allow_loopback=allow_loopback)
-        remote_filename = inspect_res.get("filename") or "download"
-        final_filename = sanitize_filename(custom_filename or remote_filename)
-        expected_total_bytes = inspect_res.get("fileSizeBytes")
-        etag = inspect_res.get("etag")
-        last_modified = inspect_res.get("lastModified")
+        # 1. Check for existing partial file and sidecar metadata first (to avoid redundant HEAD/GET requests)
+        has_valid_resume_meta = False
+        final_filename = sanitize_filename(custom_filename) if custom_filename else None
+        part_path = None
+        meta_path = None
+        expected_total_bytes = None
+        etag = None
+        last_modified = None
+        current_req_url = url
+        supports_resume = True
+
+        candidate_meta_file = None
+        if final_filename:
+            candidate_part = os.path.abspath(os.path.join(target_dir, f"{final_filename}.part"))
+            candidate_meta = os.path.abspath(os.path.join(target_dir, f"{final_filename}.part.meta.json"))
+            if os.path.exists(candidate_part) and os.path.exists(candidate_meta):
+                candidate_meta_file = candidate_meta
+                part_path = candidate_part
+                meta_path = candidate_meta
+
+        if not candidate_meta_file:
+            # Check if any .part.meta.json in target_dir matches the URL
+            try:
+                for fname in os.listdir(target_dir):
+                    if fname.endswith(".part.meta.json"):
+                        cm = os.path.join(target_dir, fname)
+                        cp = cm[:-10]  # strip .meta.json -> .part
+                        if os.path.exists(cp):
+                            try:
+                                with open(cm, "r", encoding="utf-8") as mf:
+                                    m_data = json.load(mf)
+                                if m_data.get("url") == url:
+                                    candidate_meta_file = cm
+                                    part_path = cp
+                                    meta_path = cm
+                                    break
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+        if candidate_meta_file and part_path:
+            try:
+                with open(candidate_meta_file, "r", encoding="utf-8") as mf:
+                    saved_meta = json.load(mf)
+                if saved_meta.get("url") == url:
+                    final_filename = saved_meta.get("finalFilename") or final_filename or "download"
+                    expected_total_bytes = saved_meta.get("expectedBytes")
+                    etag = saved_meta.get("etag")
+                    last_modified = saved_meta.get("lastModified")
+                    current_req_url = saved_meta.get("finalUrl") or url
+                    supports_resume = saved_meta.get("supportsResume", True)
+                    has_valid_resume_meta = True
+                    logger.info(f"Resuming download for {job_id} from existing sidecar metadata: {final_filename}")
+            except Exception as e:
+                logger.debug(f"Failed to read existing metadata: {e}")
+
+        # If we could not load valid sidecar metadata, inspect URL
+        if not has_valid_resume_meta:
+            inspect_res = self.http_service.inspect_url(url, check_dns=check_dns, allow_loopback=allow_loopback)
+            remote_filename = inspect_res.get("filename") or "download"
+            final_filename = sanitize_filename(custom_filename or remote_filename)
+            expected_total_bytes = inspect_res.get("fileSizeBytes")
+            etag = inspect_res.get("etag")
+            last_modified = inspect_res.get("lastModified")
+            current_req_url = inspect_res.get("finalUrl") or url
+            supports_resume = inspect_res.get("supportsResume", True)
 
         final_output_path = os.path.abspath(os.path.join(target_dir, final_filename))
         part_path = f"{final_output_path}.part"
@@ -145,14 +207,18 @@ class DirectStreamEngine:
                 elif last_modified:
                     headers["If-Range"] = last_modified
 
-        # 3. Stream from network
+        # 3. Stream from network with bounded 429 backoff
         session = requests.Session()
         session.headers.update(headers)
-        current_req_url = inspect_res.get("finalUrl") or url
 
         redirect_count = 0
         response = None
         downloaded_bytes = existing_bytes
+
+        MAX_429_RETRIES = 3
+        MAX_RETRY_AFTER_WAIT = 15.0
+        DEFAULT_BACKOFF_BASE = 2.0
+        retry_429_count = 0
 
         try:
             while redirect_count <= 5:
@@ -209,6 +275,34 @@ class DirectStreamEngine:
                         except Exception:
                             pass
 
+                # Handle HTTP 429 Rate Limiting with Bounded Backoff and Retry-After
+                if resp.status_code == 429:
+                    retry_after_val = resp.headers.get("Retry-After")
+                    wait_seconds = parse_retry_after(retry_after_val)
+                    if wait_seconds is None:
+                        wait_seconds = min(DEFAULT_BACKOFF_BASE ** (retry_429_count + 1), MAX_RETRY_AFTER_WAIT)
+
+                    if retry_429_count < MAX_429_RETRIES and wait_seconds <= MAX_RETRY_AFTER_WAIT:
+                        resp.close()
+                        logger.warning(
+                            f"HTTP 429 rate limit encountered for '{current_req_url}'. "
+                            f"Backing off for {wait_seconds:.1f}s (retry {retry_429_count + 1}/{MAX_429_RETRIES})."
+                        )
+                        # Interruptible wait respecting cancellation/pause
+                        cancelled = cancel_event.wait(timeout=wait_seconds)
+                        if cancelled:
+                            raise DirectDownloadCancelled()
+                        retry_429_count += 1
+                        continue
+                    else:
+                        resp.close()
+                        msg = (
+                            f"Rate limited by server (HTTP 429) for '{current_req_url}'. "
+                            f"{f'Server requested {int(wait_seconds)}s cooldown.' if wait_seconds else 'Retries exhausted.'} "
+                            "Partial download preserved; please retry after cooldown."
+                        )
+                        raise WorkerProtocolError(ProtocolErrorCode.RATE_LIMITED, msg)
+
                 response = resp
                 break
 
@@ -239,13 +333,23 @@ class DirectStreamEngine:
                         self.write_event_fn("download.completed", res_data)
                     return res_data
                 else:
-                    # Partial file corrupted or stale, restart from 0
+                    # Partial file corrupted or stale, restart cleanly from 0
                     existing_bytes = 0
                     headers.pop("Range", None)
                     headers.pop("If-Range", None)
                     session.headers.update(headers)
                     response = session.get(current_req_url, stream=True, timeout=20, allow_redirects=False)
                     status_code = response.status_code
+
+            # Handle 412 Precondition Failed (If-Range failed because remote entity changed)
+            if status_code == 412:
+                response.close()
+                existing_bytes = 0
+                headers.pop("Range", None)
+                headers.pop("If-Range", None)
+                session.headers.update(headers)
+                response = session.get(current_req_url, stream=True, timeout=20, allow_redirects=False)
+                status_code = response.status_code
 
             if status_code not in (200, 206):
                 if status_code == 429:
@@ -269,24 +373,60 @@ class DirectStreamEngine:
                         f"HTTP error {status_code} during download stream."
                     )
 
-            # Determine mode
+            total_bytes = expected_total_bytes or 0
+
+            # Determine mode and verify Content-Range
             if status_code == 206:
-                mode = "ab"
-                downloaded_bytes = existing_bytes
+                content_range = response.headers.get("Content-Range")
+                range_info = parse_content_range(content_range)
+                if range_info:
+                    range_start, range_end, range_total = range_info
+                    if range_start == existing_bytes:
+                        mode = "ab"
+                        downloaded_bytes = existing_bytes
+                        if range_total:
+                            total_bytes = range_total
+                    elif range_start == 0:
+                        # Server sent entire content from offset 0
+                        mode = "wb"
+                        downloaded_bytes = 0
+                        if range_total:
+                            total_bytes = range_total
+                    else:
+                        # Mismatched range offset; restart from 0 to prevent byte corruption
+                        logger.warning(
+                            f"Content-Range start {range_start} != existing bytes {existing_bytes}; restarting from 0."
+                        )
+                        mode = "wb"
+                        downloaded_bytes = 0
+                        if range_total:
+                            total_bytes = range_total
+                else:
+                    mode = "ab"
+                    downloaded_bytes = existing_bytes
             else:
+                # Status code 200: Server ignored Range or does not support Range requests.
+                # Cleanly truncate and write from byte 0 to prevent byte duplication or corruption.
                 mode = "wb"
                 downloaded_bytes = 0
+                if "Content-Length" in response.headers:
+                    try:
+                        total_bytes = int(response.headers["Content-Length"])
+                    except Exception:
+                        pass
 
-            # Write sidecar metadata
+            # Write / update sidecar metadata with comprehensive fields
             try:
                 with open(meta_path, "w", encoding="utf-8") as f:
                     json.dump(
                         {
                             "url": url,
-                            "etag": etag,
-                            "lastModified": last_modified,
-                            "expectedBytes": expected_total_bytes,
+                            "finalUrl": current_req_url,
+                            "etag": etag or response.headers.get("ETag"),
+                            "lastModified": last_modified or response.headers.get("Last-Modified"),
+                            "expectedBytes": total_bytes,
                             "finalFilename": final_filename,
+                            "supportsResume": status_code == 206 or ("bytes" in response.headers.get("Accept-Ranges", "").lower()),
                         },
                         f,
                     )
@@ -298,13 +438,6 @@ class DirectStreamEngine:
             bytes_since_last_calc = 0
             current_speed = 0.0
 
-            total_bytes = expected_total_bytes or 0
-            if status_code == 200 and "Content-Length" in response.headers:
-                try:
-                    total_bytes = int(response.headers["Content-Length"])
-                except Exception:
-                    pass
-
             with open(part_path, mode) as part_file:
                 for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
                     if cancel_event.is_set():
@@ -314,6 +447,7 @@ class DirectStreamEngine:
                         continue
 
                     part_file.write(chunk)
+                    part_file.flush()
                     chunk_len = len(chunk)
                     downloaded_bytes += chunk_len
                     bytes_since_last_calc += chunk_len

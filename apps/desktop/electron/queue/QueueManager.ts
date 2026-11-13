@@ -742,8 +742,10 @@ export class QueueManager extends EventEmitter {
     }
 
     job.status = 'pending';
-    job.progress = 0;
-    job.downloadedBytes = 0;
+    if (!job.downloadedBytes) {
+      job.progress = 0;
+      job.downloadedBytes = 0;
+    }
     job.error = undefined;
     job.speedBytesPerSec = 0;
     job.etaSeconds = null;

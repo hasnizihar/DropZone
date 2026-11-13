@@ -24,6 +24,40 @@ AUDIO_EXTENSIONS = {".mp3", ".m4a", ".flac", ".wav", ".aac", ".ogg", ".opus"}
 ARCHIVE_EXTENSIONS = {".zip", ".tar", ".gz", ".7z", ".rar", ".bz2", ".xz"}
 DOCUMENT_EXTENSIONS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"}
 
+def parse_retry_after(header_value: Optional[str]) -> Optional[float]:
+    """
+    Parses Retry-After header into seconds.
+    Supports numeric seconds (e.g. '10') and HTTP-date formats per RFC 9110 / RFC 7231.
+    """
+    if not header_value:
+        return None
+    val = header_value.strip()
+    if val.isdigit():
+        return float(val)
+    try:
+        from email.utils import parsedate_to_datetime
+        from datetime import datetime, timezone
+        dt = parsedate_to_datetime(val)
+        diff = (dt - datetime.now(timezone.utc)).total_seconds()
+        return max(0.0, diff)
+    except Exception:
+        return None
+
+def parse_content_range(content_range_header: Optional[str]) -> Optional[Tuple[int, int, Optional[int]]]:
+    """
+    Parses Content-Range header into (start, end, total).
+    Example: 'bytes 1048576-104857599/104857600' -> (1048576, 104857599, 104857600)
+    """
+    if not content_range_header:
+        return None
+    m = re.match(r"bytes\s+(\d+)-(\d+)/(\d+|\*)", content_range_header.strip(), re.IGNORECASE)
+    if not m:
+        return None
+    start = int(m.group(1))
+    end = int(m.group(2))
+    total = int(m.group(3)) if m.group(3) != "*" else None
+    return start, end, total
+
 def sanitize_filename(name: Optional[str]) -> str:
     """Sanitizes filename for Windows filesystem, stripping illegal characters and reserved names."""
     if not name or not isinstance(name, str):
@@ -102,6 +136,7 @@ class DirectHttpService:
         session.headers.update(self.DEFAULT_HEADERS)
 
         last_response = None
+        inspect_429_retries = 0
         while redirect_count <= self.max_redirects:
             resp = None
             try:
@@ -151,6 +186,19 @@ class DirectHttpService:
                             break
                     except Exception:
                         pass
+
+            # 4. Handle HTTP 429 with bounded backoff and Retry-After
+            if resp.status_code == 429:
+                wait_sec = parse_retry_after(resp.headers.get("Retry-After"))
+                if wait_sec is None:
+                    wait_sec = 2.0 * (inspect_429_retries + 1)
+                if inspect_429_retries < 2 and wait_sec <= 15.0:
+                    logger.info(f"inspect_url rate limited (HTTP 429) at '{current_url}'; waiting {wait_sec:.1f}s...")
+                    resp.close()
+                    import time
+                    time.sleep(wait_sec)
+                    inspect_429_retries += 1
+                    continue
 
             # Check for redirect status
             if resp.status_code in (301, 302, 303, 307, 308):
