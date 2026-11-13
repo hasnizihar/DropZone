@@ -2,6 +2,43 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.12] - 2026-11-13
+
+### Fixed
+- **Atomic Duplicate Filename Overwrite Prevention (Stage 8.2)**:
+  - Resolved bug where submitting the same URL twice created two jobs that completed successfully but overwrote the target destination file on disk.
+  - Implemented atomic destination filename reservation (`reserveUniqueFilename` and `resolveUniqueFilename`) in `QueueManager` spanning active jobs, pending queues, and disk files (`.part`, `.part.meta.json`, completed files).
+  - Added compound extension preservation (`.tar.gz`, `.tar.bz2`, `.tar.xz`, etc.) ensuring numerical suffixes are injected before extensions (e.g. `archive (1).tar.gz`).
+  - Added Windows reserved device name protection (`CON`, `PRN`, `AUX`, `NUL`, `COM1-COM9`, `LPT1-LPT9`).
+  - Scoped `.part.meta.json` sidecar discovery in `direct_stream_engine.py` to prevent subsequent jobs from hijacking existing partial downloads sharing identical URLs.
+  - Added pre-rename collision guard before `os.replace` preventing accidental overwrites.
+  - Fixed media extension duplication in `download_service.py` (`yt-dlp`), preventing `.mp4.mp4` artifacts.
+- **HTTP 429 Resume Resilience & Sidecar Metadata Caching (Stage 5.1)**:
+  - Resolved intermittent resume failures on rate-limited servers (`proof.ovh.net/files/100Mb.dat`).
+  - Implemented RFC 9110 compliant `Retry-After` header parsing supporting both numeric seconds and HTTP-date strings.
+  - Added bounded exponential backoff with jitter on HTTP 429 responses, preventing aggressive server flooding.
+  - Added cached sidecar metadata (`.part.meta.json`) skipping redundant HEAD/GET requests during resumption.
+  - Enforced strict `Content-Range` header verification, falling back to clean truncation (`mode="wb"`) when servers ignore byte-range requests.
+- **Queue Deduplication & Store Guards**:
+  - Fixed duplicate job display in Downloads queue by synchronizing Zustand store deduplication with authoritative Electron queue state.
+
+### Added
+- **Platform Compatibility Matrix & Real Download Test Runners**:
+  - Created automated platform compatibility test runner (`scripts/test-platform-matrix.py`) and real file download verifier (`scripts/test-real-downloads.py`).
+  - Established 5-tier platform compatibility taxonomy distinguishing metadata extraction from actual byte transfer.
+- **UI Enhancements**:
+  - Added clipboard paste button icon inside URL entry inputs on both `AnalyzerPage` and `DashboardPage`.
+  - Added visual progress indicator during URL inspection and format probing.
+  - Extended Electron IPC inspection timeout to 60,000ms for large video manifest extraction.
+- **Worker Protocol & Stream Merging**:
+  - Enforced strict UTF-8 stdio protocol purity on Windows preventing surrogate errors.
+  - Enabled automatic merging of separate DASH video and audio streams into single MP4 containers via yt-dlp.
+- **Documentation Suite Expansion**:
+  - Added `PRIVACY.md` formalizing the zero-telemetry, local-first architecture.
+  - Added `docs/INSTALLATION.md` covering Windows Setup, Portable binaries, SmartScreen guidance, and FFmpeg setup.
+  - Added `docs/BUILDING.md` describing monorepo compilation, worker building with PyInstaller, and packaging commands.
+  - Added `docs/TROUBLESHOOTING.md` documenting worker health, rate limiting, and duplicate filename behavior.
+
 ## [1.0.0-alpha.11] - 2026-11-13
 
 ### Added

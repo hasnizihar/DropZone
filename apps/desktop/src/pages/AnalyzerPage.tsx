@@ -121,7 +121,7 @@ export const AnalyzerPage: React.FC = () => {
         const text = await navigator.clipboard.readText();
         if (text && text.trim()) {
           setInputUrl(text.trim());
-          showToast('info', 'Pasted URL from clipboard');
+          showToast('Pasted URL from clipboard', 'info');
         }
       }
     } catch (err) {

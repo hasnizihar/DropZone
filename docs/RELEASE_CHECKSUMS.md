@@ -4,7 +4,17 @@ This document provides cryptographic SHA-256 hashes for all official DROPZONE re
 
 ---
 
-## Current Release: v1.0.0-alpha.11 (2026-11-13)
+## Current Release: v1.0.0-alpha.12 (2026-11-13)
+
+| Package Filename | Target Architecture | SHA-256 Checksum |
+| :--- | :--- | :--- |
+| `DROPZONE-Setup-1.0.0-alpha.12-x64.exe` | Windows 10/11 x64 (NSIS Installer) | `28507c3ed6c40c696bdc33ad6ae7d0646ae0ec6ba2847b6c8ea00ee6fc5ce294` |
+| `DROPZONE-Portable-1.0.0-alpha.12-x64.exe` | Windows 10/11 x64 (Portable Binary) | `39c2edcbddb4ea897e2f5dd00fbea9840f9a08ea7056ec91780082afb26993e2` |
+| `dropzone-worker.exe` | Bundled Standalone Python Worker | `903d629bd8136d0843f5763d3e9a1acb4e0e47d213fe056ba6830e317722c827` |
+
+---
+
+## Previous Release: v1.0.0-alpha.11 (2026-11-13)
 
 | Package Filename | Target Architecture | SHA-256 Checksum |
 | :--- | :--- | :--- |

@@ -11,7 +11,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-warmwhite?style=flat-square&labelColor=121417&color=F5F3EF" alt="Platform: Windows 10/11 x64" />
-  <img src="https://img.shields.io/badge/Version-v1.0.0--alpha.11-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="Version: 1.0.0-alpha.11" />
+  <img src="https://img.shields.io/badge/Version-v1.0.0--alpha.12-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="Version: 1.0.0-alpha.12" />
   <img src="https://img.shields.io/badge/Architecture-Electron%20%7C%20React%20%7C%20Python-graphite?style=flat-square&labelColor=121417&color=858B93" alt="Architecture" />
   <img src="https://img.shields.io/badge/Privacy-Zero%20Telemetry-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="Zero Telemetry" />
 </p>
@@ -28,8 +28,8 @@ Official release binaries for Windows (64-bit) are available directly from the [
 
 | Package Type | Version | Direct Asset Link | Description |
 | :--- | :--- | :--- | :--- |
-| **Windows Installer** | `1.0.0-alpha.11` | [DROPZONE-Setup-1.0.0-alpha.11-x64.exe](https://github.com/hasnizihar/DropZone/releases/latest) | Full setup wizard with Desktop & Start Menu shortcuts. Safe updates and uninstallation. |
-| **Portable Executable** | `1.0.0-alpha.11` | [DROPZONE-Portable-1.0.0-alpha.11-x64.exe](https://github.com/hasnizihar/DropZone/releases/latest) | Zero-install standalone binary. Runs immediately with no administrator privileges needed. |
+| **Windows Installer** | `1.0.0-alpha.12` | [DROPZONE-Setup-1.0.0-alpha.12-x64.exe](https://github.com/hasnizihar/DropZone/releases/latest) | Full setup wizard with Desktop & Start Menu shortcuts. Safe updates and uninstallation. |
+| **Portable Executable** | `1.0.0-alpha.12` | [DROPZONE-Portable-1.0.0-alpha.12-x64.exe](https://github.com/hasnizihar/DropZone/releases/latest) | Zero-install standalone binary. Runs immediately with no administrator privileges needed. |
 
 > [!TIP]
 > **Verifying Checksums**: Cryptographic SHA-256 hashes for all official packages are published in [docs/RELEASE_CHECKSUMS.md](docs/RELEASE_CHECKSUMS.md). You can verify your download in PowerShell with `Get-FileHash -Algorithm SHA256 <filename>`.

@@ -155,12 +155,37 @@ export class WorkerProcess {
     };
 
     if (standaloneBinary && preferStandalone) {
-      this.proc = spawn(standaloneBinary, [], {
-        cwd: path.dirname(standaloneBinary),
-        env: baseEnv,
-        shell: false,
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
+      try {
+        this.proc = spawn(standaloneBinary, [], {
+          cwd: path.dirname(standaloneBinary),
+          env: baseEnv,
+          shell: false,
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      } catch (err: any) {
+        if (err?.code === 'UNKNOWN' || err?.errno === -4094 || err?.message?.includes('spawn')) {
+          console.warn(`[WorkerProcess] Standalone worker execution blocked by OS security policy (${err.message}). Attempting Python interpreter fallback...`);
+          const workerRoot = WorkerProcess.resolveWorkerRoot(this.options.workerRoot);
+          const pythonExecutable = WorkerProcess.resolvePythonExecutable(this.options.customPythonPath, workerRoot);
+          const workerSrc = path.join(workerRoot, 'src');
+          if (fs.existsSync(workerSrc)) {
+            const env = {
+              ...baseEnv,
+              PYTHONPATH: workerSrc,
+            };
+            this.proc = spawn(pythonExecutable, ['-m', 'dropzone_worker'], {
+              cwd: workerSrc,
+              env,
+              shell: false,
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
     } else {
       if (isPackaged && !process.env.DROPZONE_ALLOW_GLOBAL_PYTHON) {
         throw new Error(

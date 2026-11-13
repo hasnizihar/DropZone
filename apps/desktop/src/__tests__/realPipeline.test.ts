@@ -17,8 +17,8 @@ describe('Real Electron Application Pipeline E2E Test (Stage 3.3)', () => {
     const workerRoot = path.resolve(__dirname, '../../../../backend/worker');
 
     // 1. Initialize SQLite Database & Repositories
-    const dbManager = new DatabaseManager(dbPath);
-    dbManager.initialize();
+    const dbManager = new DatabaseManager({ dbPath });
+    await dbManager.initialize();
     const jobRepository = new JobRepository(dbManager);
 
     // 2. Initialize WorkerManager

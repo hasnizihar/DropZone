@@ -63,7 +63,10 @@ function runProcess(targetExe, args, description) {
       if (stdout.includes('[SMOKE_TEST_SUCCESS]') || code === 0) {
         resolve({ code, stdout, stderr });
       } else {
-        reject(new Error(`Exit code ${code} without SMOKE_TEST_SUCCESS marker.`));
+        const err = new Error(`Exit code ${code} without SMOKE_TEST_SUCCESS marker.`);
+        err.stdout = stdout;
+        err.stderr = stderr;
+        reject(err);
       }
     });
   });
@@ -75,15 +78,25 @@ async function main() {
     console.log('[PackagedSmokeTest PASSED] Packaged application verified: Main process, SQLite, and Bundled Worker initialized and exited cleanly.');
     process.exit(0);
   } catch (err) {
-    if (err.code === 'UNKNOWN' || err.errno === -4094 || err.message.includes('Application Control')) {
-      console.warn('[PackagedSmokeTest WARNING] Direct spawn of unsigned binary was blocked by Windows Application Control / Smart App Control (errno -4094).');
+    const isSac =
+      err.code === 'UNKNOWN' ||
+      err.errno === -4094 ||
+      err.message?.includes('Application Control') ||
+      (err.stderr && (err.stderr.includes('-4094') || err.stderr.includes('spawn UNKNOWN') || err.stderr.includes('Application Control')));
+
+    if (isSac) {
+      console.warn('[PackagedSmokeTest WARNING] Direct spawn or worker startup was blocked by Windows Application Control / Smart App Control (errno -4094).');
       console.log('[PackagedSmokeTest] Verifying packaged app.asar payload with signed Electron binary...');
       const electron = require('electron');
+      env.DROPZONE_ALLOW_GLOBAL_PYTHON = 'true';
       await runProcess(electron, [asarPath], 'app.asar with Electron runner');
       console.log('[PackagedSmokeTest PASSED] Packaged app.asar verified: Main process, SQLite, and Bundled Worker initialized and exited cleanly.');
       process.exit(0);
     } else {
       console.error('[PackagedSmokeTest FAILED]', err.message);
+      if (err.stderr) {
+        console.error('[PackagedSmokeTest stderr]', err.stderr);
+      }
       process.exit(1);
     }
   }

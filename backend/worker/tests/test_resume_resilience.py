@@ -252,3 +252,4 @@ def test_permanent_429_preserves_partial_data(tmp_path, resilience_server):
     assert part_file.exists()
     assert len(part_file.read_bytes()) == 15000
     assert meta_file.exists()
+
