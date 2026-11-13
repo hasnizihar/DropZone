@@ -167,7 +167,7 @@ export class WorkerManager extends EventEmitter {
     }
   }
 
-  public async analyzeUrl(url: string, timeoutMs = 45000): Promise<AnalyzeUrlResponsePayload> {
+  public async analyzeUrl(url: string, timeoutMs = 60000): Promise<AnalyzeUrlResponsePayload> {
     return this.sendRequest<AnalyzeUrlResponsePayload>(
       WORKER_COMMANDS.ANALYZE_URL,
       { url },

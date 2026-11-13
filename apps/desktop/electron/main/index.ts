@@ -268,7 +268,7 @@ function setupIpcHandlers() {
         }
       }
 
-      const response = await workerManager.analyzeUrl(url.trim(), 35000);
+      const response = await workerManager.analyzeUrl(url.trim(), 60000);
       if (!response) {
         return { success: false, error: 'Analyzer returned empty or invalid response.' };
       }
