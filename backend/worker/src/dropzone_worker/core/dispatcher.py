@@ -130,8 +130,12 @@ class CommandDispatcher:
         media_error = None
         try:
             res = self.analyzer.analyze(url)
-            res["downloadType"] = "media"
-            return res
+            extractor_name = (res.get("extractor", {}).get("name") or "").lower()
+            formats = res.get("formats", [])
+            # If yt-dlp extracted via a dedicated service extractor or discovered stream formats:
+            if extractor_name not in ("generic", "") or len(formats) > 0:
+                res["downloadType"] = "media"
+                return res
         except Exception as exc:
             media_error = exc
 

@@ -18,6 +18,7 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:python": "python -m pytest backend/worker/tests -v",
+    "test:platforms": "python scripts/test-platform-matrix.py",
     "postinstall": "node scripts/patch-electron-builder.cjs",
     "build:worker": "python scripts/build-worker.py",
     "build:icons": "python scripts/generate-icons.py",

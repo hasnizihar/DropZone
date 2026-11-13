@@ -66,3 +66,12 @@ def test_dispatch_unknown_command(dispatcher_fixture):
     assert exc_info.value.code == ProtocolErrorCode.UNKNOWN_COMMAND
     assert health.errors_count == 1
 
+def test_dispatcher_analyze_unified_generic_fallback(dispatcher_fixture):
+    dispatcher, _, _ = dispatcher_fixture
+    # Verify that an archive URL falling back from generic routes to direct HTTP
+    url = "https://github.com/hasnizihar/dropzone/archive/refs/tags/v1.0.0-alpha.10.zip"
+    res = dispatcher._analyze_unified(url)
+    assert res is not None
+    assert "downloadType" in res
+    assert res["downloadType"] in ("file", "gallery")
+

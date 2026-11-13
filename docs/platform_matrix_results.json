@@ -1,0 +1,448 @@
+[
+  {
+    "platform": "YouTube (Video)",
+    "group": "Video Platforms",
+    "phase": "Phase 1",
+    "url": "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
+    "engine": "yt-dlp",
+    "status": "Passed",
+    "durationMs": 1855,
+    "extracted": {
+      "downloadType": "media",
+      "title": "Big Buck Bunny 60fps 4K - Official Blender Foundation Short ",
+      "extractor": "Youtube",
+      "durationMs": 1855,
+      "formatsCount": 47,
+      "assetsCount": 0
+    },
+    "notes": "4K 60fps Big Buck Bunny open-source test stream with DASH video+audio tracks",
+    "error": null
+  },
+  {
+    "platform": "YouTube (Shorts)",
+    "group": "Video Platforms",
+    "phase": "Phase 1",
+    "url": "https://youtube.com/shorts/aBBXver4zxQ",
+    "engine": "yt-dlp",
+    "status": "Passed",
+    "durationMs": 1987,
+    "extracted": {
+      "downloadType": "media",
+      "title": "Is EffectCraft better than After Effects? The REALITY",
+      "extractor": "Youtube",
+      "durationMs": 1987,
+      "formatsCount": 45,
+      "assetsCount": 0
+    },
+    "notes": "Short-form vertical video",
+    "error": null
+  },
+  {
+    "platform": "YouTube (Playlist)",
+    "group": "Video Platforms",
+    "phase": "Phase 1",
+    "url": "https://www.youtube.com/playlist?list=PLrEnWoR732-BHrPp_Pm8_VleD68f9n14-",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 5351,
+    "extracted": {},
+    "notes": "Multi-video collection with bounded pagination protection",
+    "error": "[youtube:tab] PLrEnWoR732-BHrPp_Pm8_VleD68f9n14-: YouTube said: The playlist does not exist."
+  },
+  {
+    "platform": "Vimeo",
+    "group": "Video Platforms",
+    "phase": "Phase 1",
+    "url": "https://vimeo.com/76979871",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 3515,
+    "extracted": {},
+    "notes": "Public Vimeo staff pick; multi-bitrate HLS/MP4 streams (Login / Authentication required for this specific asset)",
+    "error": "[vimeo] 76979871: The web client only works when logged-in. Use --cookies, --cookies-from-browser, --username and --password, --netrc-cmd, or --netrc (vimeo) to provide account credentials. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies"
+  },
+  {
+    "platform": "TikTok",
+    "group": "Video Platforms",
+    "phase": "Phase 2",
+    "url": "https://www.tiktok.com/@tiktok/video/7106594312292453675",
+    "engine": "yt-dlp",
+    "status": "Passed",
+    "durationMs": 1052,
+    "extracted": {
+      "downloadType": "media",
+      "title": "how many frogs did you find? \ud83d\udc38 check out tiktok\u2019s #Minecraft",
+      "extractor": "Tiktok",
+      "durationMs": 1052,
+      "formatsCount": 14,
+      "assetsCount": 0
+    },
+    "notes": "Public TikTok video without watermark",
+    "error": null
+  },
+  {
+    "platform": "Instagram (Video / Reel)",
+    "group": "Video Platforms",
+    "phase": "Phase 2",
+    "url": "https://www.instagram.com/p/CQgFKYBh4HX/?hl=en",
+    "engine": "yt-dlp",
+    "status": "Passed",
+    "durationMs": 2879,
+    "extracted": {
+      "downloadType": "media",
+      "title": "Video by template.engineer",
+      "extractor": "Instagram",
+      "durationMs": 2879,
+      "formatsCount": 2,
+      "assetsCount": 0
+    },
+    "notes": "Public video post; Unicode metadata and DASH audio/video merging",
+    "error": null
+  },
+  {
+    "platform": "Facebook (Public Video)",
+    "group": "Video Platforms",
+    "phase": "Phase 2",
+    "url": "https://www.facebook.com/watch/?v=10153231379946729",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 2596,
+    "extracted": {
+      "downloadType": "media",
+      "title": "How to Share With Just Friends",
+      "extractor": "Facebook",
+      "durationMs": 2596,
+      "formatsCount": 0,
+      "assetsCount": 0
+    },
+    "notes": "Public Facebook video post (subject to Facebook session walls)",
+    "error": null
+  },
+  {
+    "platform": "Twitch (Clips & VOD)",
+    "group": "Video Platforms",
+    "phase": "Phase 4",
+    "url": "https://clips.twitch.tv/BlushingAwkwardHerringTBTacoRight",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 2212,
+    "extracted": {},
+    "notes": "Public Twitch clip stream",
+    "error": "[twitch:clips] BlushingAwkwardHerringTBTacoRight: This clip is no longer available"
+  },
+  {
+    "platform": "SoundCloud",
+    "group": "Other Media Platforms",
+    "phase": "Phase 4",
+    "url": "https://soundcloud.com/freemusicforvlogs/alano-ocean-free-music-for-vlogs",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 3639,
+    "extracted": {},
+    "notes": "Public royalty-free audio stream; formats mp3/opus (Sample test asset moved or expired)",
+    "error": "[soundcloud] freemusicforvlogs/alano-ocean-free-music-for-vlogs: Unable to download JSON metadata: HTTP Error 404: Not Found (caused by <HTTPError 404: Not Found>)"
+  },
+  {
+    "platform": "Dailymotion",
+    "group": "Other Media Platforms",
+    "phase": "Phase 4",
+    "url": "https://www.dailymotion.com/video/x7tgad0",
+    "engine": "yt-dlp",
+    "status": "Passed",
+    "durationMs": 3129,
+    "extracted": {
+      "downloadType": "media",
+      "title": "Midnight Sun | Iceland",
+      "extractor": "Dailymotion",
+      "durationMs": 3129,
+      "formatsCount": 3,
+      "assetsCount": 0
+    },
+    "notes": "Public Dailymotion video stream",
+    "error": null
+  },
+  {
+    "platform": "Reddit (Video Post)",
+    "group": "Other Media Platforms",
+    "phase": "Phase 2",
+    "url": "https://www.reddit.com/r/aww/comments/181p21s/",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 3529,
+    "extracted": {},
+    "notes": "Reddit DASH video+audio post (Login / Authentication required for this specific asset)",
+    "error": "[Reddit] 181p21s: Account authentication is required. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies"
+  },
+  {
+    "platform": "X / Twitter (Video)",
+    "group": "Other Media Platforms",
+    "phase": "Phase 2",
+    "url": "https://x.com/Twitter/status/1278763679421431809",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 2608,
+    "extracted": {},
+    "notes": "Public X / Twitter video tweet",
+    "error": "[twitter] 1278763679421431809: No video could be found in this tweet"
+  },
+  {
+    "platform": "Pinterest (Video Pin)",
+    "group": "Other Media Platforms",
+    "phase": "Phase 3",
+    "url": "https://www.pinterest.com/pin/993606736517855325/",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 2527,
+    "extracted": {},
+    "notes": "Public Pinterest video pin",
+    "error": "[Pinterest] 993606736517855325: No video formats found!; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U"
+  },
+  {
+    "platform": "Bilibili",
+    "group": "Other Media Platforms",
+    "phase": "Phase 4",
+    "url": "https://www.bilibili.com/video/BV1xx411c7mD",
+    "engine": "yt-dlp",
+    "status": "Passed",
+    "durationMs": 2442,
+    "extracted": {
+      "downloadType": "media",
+      "title": "\u5b57\u5e55\u541b\u4ea4\u6d41\u573a\u6240",
+      "extractor": "Bilibili",
+      "durationMs": 2442,
+      "formatsCount": 8,
+      "assetsCount": 0
+    },
+    "notes": "Public Bilibili video (may require regional CDN fallback or cookies for >480p)",
+    "error": null
+  },
+  {
+    "platform": "Rumble",
+    "group": "Other Media Platforms",
+    "phase": "Phase 4",
+    "url": "https://rumble.com/v104r4w-space-station-live-stream.html",
+    "engine": "yt-dlp",
+    "status": "Partial",
+    "durationMs": 1798,
+    "extracted": {},
+    "notes": "Public Rumble video stream",
+    "error": "[Rumble] v104r4w-space-station-live-stream.html: Unable to download webpage: HTTP Error 403: Forbidden (caused by <HTTPError 403: Forbidden>)"
+  },
+  {
+    "platform": "GitHub (Release Asset / ZIP)",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 1",
+    "url": "https://github.com/hasnizihar/dropzone/archive/refs/tags/v1.0.0-alpha.10.zip",
+    "engine": "direct-http",
+    "status": "Passed",
+    "durationMs": 2327,
+    "extracted": {
+      "downloadType": "gallery",
+      "title": "directlink",
+      "extractor": "Unknown",
+      "durationMs": 2327,
+      "formatsCount": 0,
+      "assetsCount": 1
+    },
+    "notes": "Direct archive download with Content-Length and Range chunking",
+    "error": null
+  },
+  {
+    "platform": "Internet Archive",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 1",
+    "url": "https://archive.org/download/BigBuckBunny_328/BigBuckBunny_512kb.mp4",
+    "engine": "direct-http",
+    "status": "Partial",
+    "durationMs": 3994,
+    "extracted": {
+      "downloadType": "media",
+      "title": "BigBuckBunny_512kb",
+      "extractor": "Generic",
+      "durationMs": 3994,
+      "formatsCount": 0,
+      "assetsCount": 0
+    },
+    "notes": "Public domain media file hosted on archive.org",
+    "error": null
+  },
+  {
+    "platform": "Direct HTTP (PDF Document)",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 1",
+    "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "engine": "direct-http",
+    "status": "Partial",
+    "durationMs": 797,
+    "extracted": {
+      "downloadType": "media",
+      "title": "dummy",
+      "extractor": "Generic",
+      "durationMs": 797,
+      "formatsCount": 0,
+      "assetsCount": 0
+    },
+    "notes": "Direct PDF document stream with resume support",
+    "error": null
+  },
+  {
+    "platform": "Direct HTTP (MP3 Audio)",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 1",
+    "url": "https://filesamples.com/samples/audio/mp3/sample3.mp3",
+    "engine": "direct-http",
+    "status": "Passed",
+    "durationMs": 899,
+    "extracted": {
+      "downloadType": "media",
+      "title": "sample3",
+      "extractor": "Generic",
+      "durationMs": 899,
+      "formatsCount": 1,
+      "assetsCount": 0
+    },
+    "notes": "Direct audio file stream",
+    "error": null
+  },
+  {
+    "platform": "Direct HTTP (MP4 Video)",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 1",
+    "url": "https://filesamples.com/samples/video/mp4/sample_960x540.mp4",
+    "engine": "direct-http",
+    "status": "Partial",
+    "durationMs": 882,
+    "extracted": {
+      "downloadType": "media",
+      "title": "sample_960x540",
+      "extractor": "Generic",
+      "durationMs": 882,
+      "formatsCount": 0,
+      "assetsCount": 0
+    },
+    "notes": "Direct video file stream",
+    "error": null
+  },
+  {
+    "platform": "Google Drive (Shared File)",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 4",
+    "url": "https://drive.google.com/uc?id=1Yj5p_zQk_TEST_SAMPLE&export=download",
+    "engine": "direct-http / yt-dlp",
+    "status": "Partial",
+    "durationMs": 3869,
+    "extracted": {},
+    "notes": "Requires public shared permissions or direct export link; subject to virus scan warning interstitials on >100MB files (Sample test asset moved or expired)",
+    "error": "[generic] uc?id=1Yj5p_zQk_TEST_SAMPLE&export=download: Unable to download webpage: HTTP Error 404: Not Found (caused by <HTTPError 404: Not Found>)"
+  },
+  {
+    "platform": "Dropbox (Shared Link)",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 4",
+    "url": "https://www.dropbox.com/scl/fi/sample/test.mp4?raw=1",
+    "engine": "direct-http",
+    "status": "Passed",
+    "durationMs": 1251,
+    "extracted": {
+      "downloadType": "gallery",
+      "title": "directlink",
+      "extractor": "Unknown",
+      "durationMs": 1251,
+      "formatsCount": 0,
+      "assetsCount": 1
+    },
+    "notes": "Direct file download with ?raw=1 parameter",
+    "error": null
+  },
+  {
+    "platform": "OneDrive (Shared Link)",
+    "group": "Direct File & Cloud",
+    "phase": "Phase 4",
+    "url": "https://1drv.ms/u/s!sample",
+    "engine": "direct-http",
+    "status": "Partial",
+    "durationMs": 6564,
+    "extracted": {},
+    "notes": "Shared links require conversion to direct download link (download.aspx)",
+    "error": "[generic] s!sample: Unable to download webpage: HTTP Error 503: RequestQueueFull for Global API Queue: (caused by <HTTPError 503: RequestQueueFull for Global API Queue:>)"
+  },
+  {
+    "platform": "Instagram (Image Post)",
+    "group": "Gallery & Images",
+    "phase": "Phase 2",
+    "url": "https://www.instagram.com/p/CQgFKYBh4HX/?hl=en",
+    "engine": "yt-dlp / gallery-dl",
+    "status": "Passed",
+    "durationMs": 2252,
+    "extracted": {
+      "downloadType": "media",
+      "title": "Video by template.engineer",
+      "extractor": "Instagram",
+      "durationMs": 2252,
+      "formatsCount": 2,
+      "assetsCount": 0
+    },
+    "notes": "Public Instagram image/post extraction",
+    "error": null
+  },
+  {
+    "platform": "Flickr (Public Photos)",
+    "group": "Gallery & Images",
+    "phase": "Phase 3",
+    "url": "https://www.flickr.com/photos/nasa-hq/53066467067/",
+    "engine": "gallery-dl / yt-dlp",
+    "status": "Partial",
+    "durationMs": 2882,
+    "extracted": {},
+    "notes": "Public NASA HQ photo on Flickr",
+    "error": "[Flickr] 53066467067: Unable to download JSON metadata: HTTP Error 502: Bad Gateway (caused by <HTTPError 502: Bad Gateway>)"
+  },
+  {
+    "platform": "Reddit (Image Post)",
+    "group": "Gallery & Images",
+    "phase": "Phase 2",
+    "url": "https://www.reddit.com/r/pics/comments/181p21s/",
+    "engine": "gallery-dl",
+    "status": "Partial",
+    "durationMs": 3613,
+    "extracted": {},
+    "notes": "Public Reddit image post (Login / Authentication required for this specific asset)",
+    "error": "[Reddit] 181p21s: Account authentication is required. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies"
+  },
+  {
+    "platform": "Pinterest (Image Pin)",
+    "group": "Gallery & Images",
+    "phase": "Phase 3",
+    "url": "https://www.pinterest.com/pin/993606736517855325/",
+    "engine": "gallery-dl / yt-dlp",
+    "status": "Partial",
+    "durationMs": 2521,
+    "extracted": {},
+    "notes": "Public image pin (full collection requires login cookies)",
+    "error": "[Pinterest] 993606736517855325: No video formats found!; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U"
+  },
+  {
+    "platform": "DeviantArt",
+    "group": "Gallery & Images",
+    "phase": "Phase 3",
+    "url": "https://www.deviantart.com/popular-all-time",
+    "engine": "gallery-dl",
+    "status": "Unsupported",
+    "durationMs": 10432,
+    "extracted": {},
+    "notes": "Public DeviantArt gallery (API requires OAuth for non-public assets)",
+    "error": "Unsupported URL: https://www.deviantart.com/"
+  },
+  {
+    "platform": "ArtStation",
+    "group": "Gallery & Images",
+    "phase": "Phase 3",
+    "url": "https://www.artstation.com/artwork/sample",
+    "engine": "gallery-dl",
+    "status": "Partial",
+    "durationMs": 1665,
+    "extracted": {},
+    "notes": "Public ArtStation artwork pages (Cloudflare Turnstile may apply) (Host gated by Cloudflare / anti-bot challenge)",
+    "error": "[generic] Got HTTP Error 403 caused by Cloudflare anti-bot challenge; try again with  --extractor-args \"generic:impersonate\""
+  }
+]
