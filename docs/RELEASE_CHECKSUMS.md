@@ -8,9 +8,9 @@ This document provides cryptographic SHA-256 hashes for all official DROPZONE re
 
 | Package Filename | Target Architecture | SHA-256 Checksum |
 | :--- | :--- | :--- |
-| `DROPZONE-Setup-1.0.0-alpha.11-x64.exe` | Windows 10/11 x64 (NSIS Installer) | `477dfc9d66292069c7a375d3c73072a6ddc22b0483b61783c59bbb8165274967` |
-| `DROPZONE-Portable-1.0.0-alpha.11-x64.exe` | Windows 10/11 x64 (Portable Binary) | `b6b6b5014e501c4949d912d3369067459e4c0cb419c20455a38fa45963a8430a` |
-| `dropzone-worker.exe` | Bundled Standalone Python Worker | `8b7e9e6b3d2363c9f95c78950e51695d4783469ec172a9d535dba0c947caadd7` |
+| `DROPZONE-Setup-1.0.0-alpha.11-x64.exe` | Windows 10/11 x64 (NSIS Installer) | `9029419fb68adaa1126ca69209f682a5c0c688384d58aefd6d906da4bb1498fe` |
+| `DROPZONE-Portable-1.0.0-alpha.11-x64.exe` | Windows 10/11 x64 (Portable Binary) | `916ed91cfdc017a6c0786ecc0b47bac6111c117afc34d52ca154cdb72db6600f` |
+| `dropzone-worker.exe` | Bundled Standalone Python Worker | `c180c54f6cc8a450d0d5807e32e17de0a1c19779ed295c23f120d1a2ed6a0701` |
 
 ---
 
@@ -37,7 +37,7 @@ Verify that the returned hash matches the table above.
 
 ### Automated Hash Check (PowerShell)
 ```powershell
-$expected = "477dfc9d66292069c7a375d3c73072a6ddc22b0483b61783c59bbb8165274967"
+$expected = "9029419fb68adaa1126ca69209f682a5c0c688384d58aefd6d906da4bb1498fe"
 $actual = (Get-FileHash -Algorithm SHA256 "DROPZONE-Setup-1.0.0-alpha.11-x64.exe").Hash.ToLower()
 
 if ($expected -eq $actual) {
