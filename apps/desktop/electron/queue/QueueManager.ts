@@ -453,6 +453,20 @@ export class QueueManager extends EventEmitter {
     }
 
     // 4. Single Download Job
+    // Deduplication Guard: If an identical non-parent download is currently active or pending, return it
+    if (!options.parentJobId) {
+      const activeDuplicate = Array.from(this.jobs.values()).find(
+        (j) =>
+          !j.parentJobId &&
+          j.url === options.url &&
+          (j.status === 'downloading' || j.status === 'pending' || j.status === 'processing') &&
+          (j.selectedFormatId || 'best') === (options.selectedFormatId || 'best')
+      );
+      if (activeDuplicate) {
+        return activeDuplicate;
+      }
+    }
+
     const id = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const filename = options.customFilename || options.url.split('/').pop()?.split('?')[0] || 'Download Job';
     const isImage = options.category === 'image' || /\.(jpe?g|png|gif|webp|svg|bmp|tiff|avif)($|\?)/i.test(options.url);

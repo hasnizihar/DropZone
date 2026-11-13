@@ -76,6 +76,7 @@ export const AnalyzerPage: React.FC = () => {
   const [formatFilter, setFormatFilter] = useState<FormatFilter>('all');
   const [customFilename, setCustomFilename] = useState(analyzedMedia?.title || '');
   const [targetDir, setTargetDir] = useState(settings.defaultDownloadDir);
+  const [isStartingDownload, setIsStartingDownload] = useState(false);
 
   // Post-processing options (Milestone 7)
   const [postProcessMode, setPostProcessMode] = useState<'original' | 'audio' | 'remux'>('original');
@@ -121,101 +122,106 @@ export const AnalyzerPage: React.FC = () => {
   };
 
   const handleStartDownload = async (action: 'start' | 'queue') => {
-    if (!analyzedMedia) return;
+    if (isStartingDownload || !analyzedMedia) return;
+    setIsStartingDownload(true);
 
-    // Playlist download
-    if (analyzedPlaylist && analyzedPlaylist.entries.length > 0) {
-      const selectedEntries = analyzedPlaylist.entries.filter((e) => e.selected && e.isAvailable);
-      if (selectedEntries.length === 0) {
-        showToast('Please select at least one available video from the playlist.', 'error');
+    try {
+      // Playlist download
+      if (analyzedPlaylist && analyzedPlaylist.entries.length > 0) {
+        const selectedEntries = analyzedPlaylist.entries.filter((e) => e.selected && e.isAvailable);
+        if (selectedEntries.length === 0) {
+          showToast('Please select at least one available video from the playlist.', 'error');
+          return;
+        }
+        const ok = await addJob({
+          url: analyzedMedia.url,
+          customFilename: customFilename.trim() || analyzedPlaylist.title,
+          targetDirectory: targetDir || settings.defaultDownloadDir,
+          category: 'playlist',
+          engine: 'playlist',
+          playlistItems: selectedEntries,
+        });
+        if (ok) {
+          showToast(action === 'start' ? 'Playlist download started!' : 'Playlist added to download queue', 'success');
+          setActiveTab('downloads');
+        }
         return;
       }
-      const ok = await addJob({
-        url: analyzedMedia.url,
-        customFilename: customFilename.trim() || analyzedPlaylist.title,
-        targetDirectory: targetDir || settings.defaultDownloadDir,
-        category: 'playlist',
-        engine: 'playlist',
-        playlistItems: selectedEntries,
-      });
-      if (ok) {
-        showToast(action === 'start' ? 'Playlist download started!' : 'Playlist added to download queue', 'success');
-        setActiveTab('downloads');
-      }
-      return;
-    }
 
-    // Gallery download
-    if (analyzedGallery && analyzedGallery.assets.length > 0) {
-      const selectedAssets = analyzedGallery.assets.filter((a) => a.selected !== false);
-      if (selectedAssets.length === 0) {
-        showToast('Please select at least one image to download.', 'error');
+      // Gallery download
+      if (analyzedGallery && analyzedGallery.assets.length > 0) {
+        const selectedAssets = analyzedGallery.assets.filter((a) => a.selected !== false);
+        if (selectedAssets.length === 0) {
+          showToast('Please select at least one image to download.', 'error');
+          return;
+        }
+        const ok = await addJob({
+          url: analyzedMedia.url,
+          customFilename: customFilename.trim() || analyzedGallery.title,
+          targetDirectory: targetDir || settings.defaultDownloadDir,
+          category: 'image',
+          engine: 'image-gallery',
+          assets: selectedAssets,
+        });
+        if (ok) {
+          showToast(action === 'start' ? 'Gallery download started!' : 'Gallery added to download queue', 'success');
+          setActiveTab('downloads');
+        }
         return;
       }
+
+      // Direct File download
+      if (analyzedFile) {
+        const ok = await addJob({
+          url: analyzedFile.url,
+          customFilename: customFilename.trim() || analyzedFile.filename,
+          targetDirectory: targetDir || settings.defaultDownloadDir,
+          category: analyzedFile.category,
+          engine: 'direct-http',
+        });
+        if (ok) {
+          showToast(action === 'start' ? 'Direct download started!' : 'Added to download queue', 'success');
+          setActiveTab('downloads');
+        }
+        return;
+      }
+
+      // Standard media download
+      const isAudio = analyzedMedia.metadata?.mediaType === 'audio' || selectedFormat?.isAudio;
+      let postProcess: PostProcessOptions | undefined = undefined;
+
+      if (postProcessMode === 'audio') {
+        postProcess = {
+          action: 'extract_audio',
+          audioFormat: selectedAudioFormat,
+          audioBitrate: selectedAudioBitrate,
+          embedMetadata,
+          preserveSource,
+        };
+      } else if (postProcessMode === 'remux') {
+        postProcess = {
+          action: 'remux',
+          remuxContainer: selectedRemuxContainer,
+          embedMetadata,
+          preserveSource,
+        };
+      }
+
       const ok = await addJob({
         url: analyzedMedia.url,
-        customFilename: customFilename.trim() || analyzedGallery.title,
+        selectedFormatId: selectedFormatId || undefined,
+        customFilename: customFilename.trim() || analyzedMedia.title,
         targetDirectory: targetDir || settings.defaultDownloadDir,
-        category: 'image',
-        engine: 'image-gallery',
-        assets: selectedAssets,
+        category: (isAudio || postProcessMode === 'audio') ? 'file' : analyzedMedia.category,
+        engine: 'yt-dlp',
+        postProcess,
       });
       if (ok) {
-        showToast(action === 'start' ? 'Gallery download started!' : 'Gallery added to download queue', 'success');
+        showToast(action === 'start' ? 'Download started!' : 'Added to download queue', 'success');
         setActiveTab('downloads');
       }
-      return;
-    }
-
-    // Direct File download
-    if (analyzedFile) {
-      const ok = await addJob({
-        url: analyzedFile.url,
-        customFilename: customFilename.trim() || analyzedFile.filename,
-        targetDirectory: targetDir || settings.defaultDownloadDir,
-        category: analyzedFile.category,
-        engine: 'direct-http',
-      });
-      if (ok) {
-        showToast(action === 'start' ? 'Direct download started!' : 'Added to download queue', 'success');
-        setActiveTab('downloads');
-      }
-      return;
-    }
-
-    // Standard media download
-    const isAudio = analyzedMedia.metadata?.mediaType === 'audio' || selectedFormat?.isAudio;
-    let postProcess: PostProcessOptions | undefined = undefined;
-
-    if (postProcessMode === 'audio') {
-      postProcess = {
-        action: 'extract_audio',
-        audioFormat: selectedAudioFormat,
-        audioBitrate: selectedAudioBitrate,
-        embedMetadata,
-        preserveSource,
-      };
-    } else if (postProcessMode === 'remux') {
-      postProcess = {
-        action: 'remux',
-        remuxContainer: selectedRemuxContainer,
-        embedMetadata,
-        preserveSource,
-      };
-    }
-
-    const ok = await addJob({
-      url: analyzedMedia.url,
-      selectedFormatId: selectedFormatId || undefined,
-      customFilename: customFilename.trim() || analyzedMedia.title,
-      targetDirectory: targetDir || settings.defaultDownloadDir,
-      category: (isAudio || postProcessMode === 'audio') ? 'file' : analyzedMedia.category,
-      engine: 'yt-dlp',
-      postProcess,
-    });
-    if (ok) {
-      showToast(action === 'start' ? 'Download started!' : 'Added to download queue', 'success');
-      setActiveTab('downloads');
+    } finally {
+      setIsStartingDownload(false);
     }
   };
 
@@ -863,18 +869,29 @@ export const AnalyzerPage: React.FC = () => {
           <div className="pt-2 flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => handleStartDownload('start')}
-              className="flex-1 py-3 bg-brand-lime text-brand-black font-bold rounded-lg text-sm hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 shadow-sm"
+              disabled={isStartingDownload}
+              className="flex-1 py-3 bg-brand-lime text-brand-black font-bold rounded-lg text-sm hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center space-x-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Download className="w-4 h-4" />
-              <span>
-                {isGalleryType
-                  ? `Download Selected (${analyzedGallery?.assets.filter((a) => a.selected !== false).length || 0} images)`
-                  : 'Start Download'}
-              </span>
+              {isStartingDownload ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Starting Download...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  <span>
+                    {isGalleryType
+                      ? `Download Selected (${analyzedGallery?.assets.filter((a) => a.selected !== false).length || 0} images)`
+                      : 'Start Download'}
+                  </span>
+                </>
+              )}
             </button>
             <button
               onClick={() => handleStartDownload('queue')}
-              className="px-6 py-3 bg-brand-surface border border-brand-border text-brand-white font-semibold rounded-lg text-sm hover:bg-brand-black transition-colors flex items-center justify-center space-x-2"
+              disabled={isStartingDownload}
+              className="px-6 py-3 bg-brand-surface border border-brand-border text-brand-white font-semibold rounded-lg text-sm hover:bg-brand-black transition-colors flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus className="w-4 h-4" />
               <span>Add to Queue</span>

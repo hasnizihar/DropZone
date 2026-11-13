@@ -38,7 +38,16 @@ export const DownloadsPage: React.FC = () => {
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'queued' | 'completed' | 'failed'>('all');
 
-  const filteredJobs = jobs.filter((job) => {
+  const uniqueJobs = React.useMemo(() => {
+    const seen = new Set<string>();
+    return jobs.filter((job) => {
+      if (seen.has(job.id)) return false;
+      seen.add(job.id);
+      return true;
+    });
+  }, [jobs]);
+
+  const filteredJobs = uniqueJobs.filter((job) => {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'active') return job.status === 'downloading' || job.status === 'processing';
     if (activeFilter === 'queued') return job.status === 'pending';
@@ -89,11 +98,11 @@ export const DownloadsPage: React.FC = () => {
       {/* Filter Tabs */}
       <div className="flex border-b border-brand-border space-x-2">
         {[
-          { id: 'all', label: 'All Jobs', count: jobs.length },
-          { id: 'active', label: 'Active', count: jobs.filter((j) => j.status === 'downloading' || j.status === 'processing').length },
-          { id: 'queued', label: 'Queued', count: jobs.filter((j) => j.status === 'pending').length },
-          { id: 'completed', label: 'Completed', count: jobs.filter((j) => j.status === 'completed').length },
-          { id: 'failed', label: 'Failed', count: jobs.filter((j) => j.status === 'failed' || j.status === 'cancelled').length },
+          { id: 'all', label: 'All Jobs', count: uniqueJobs.length },
+          { id: 'active', label: 'Active', count: uniqueJobs.filter((j) => j.status === 'downloading' || j.status === 'processing').length },
+          { id: 'queued', label: 'Queued', count: uniqueJobs.filter((j) => j.status === 'pending').length },
+          { id: 'completed', label: 'Completed', count: uniqueJobs.filter((j) => j.status === 'completed').length },
+          { id: 'failed', label: 'Failed', count: uniqueJobs.filter((j) => j.status === 'failed' || j.status === 'cancelled').length },
         ].map((tab) => (
           <button
             key={tab.id}

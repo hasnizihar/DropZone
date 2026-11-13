@@ -15,6 +15,28 @@ import type {
 } from '@dropzone/shared';
 import { DEFAULT_SETTINGS } from '@dropzone/shared';
 
+function deduplicateJobs(jobs: DownloadJob[]): DownloadJob[] {
+  const seen = new Set<string>();
+  const unique: DownloadJob[] = [];
+  for (const j of jobs) {
+    if (!seen.has(j.id)) {
+      seen.add(j.id);
+      unique.push(j);
+    }
+  }
+  return unique;
+}
+
+function upsertJob(jobs: DownloadJob[], job: DownloadJob): DownloadJob[] {
+  const index = jobs.findIndex((j) => j.id === job.id);
+  if (index >= 0) {
+    return jobs
+      .map((j, idx) => (idx === index ? job : j))
+      .filter((j, idx) => idx === index || j.id !== job.id);
+  }
+  return [job, ...jobs.filter((j) => j.id !== job.id)];
+}
+
 export type NavigationTab =
   | 'dashboard'
   | 'analyzer'
@@ -296,7 +318,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         systemInfo: sysInfo,
         settings: settings || DEFAULT_SETTINGS,
-        jobs: jobs || [],
+        jobs: deduplicateJobs(jobs || []),
         workerStatus,
         ffmpegInfo: ffmpegInfo || null,
       });
@@ -306,22 +328,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       // Register live listeners
       window.dropzone.onDownloadProgress((updatedJob) => {
-        set((state) => {
-          const exists = state.jobs.some((j) => j.id === updatedJob.id);
-          if (exists) {
-            return {
-              jobs: state.jobs.map((j) => (j.id === updatedJob.id ? updatedJob : j)),
-            };
-          }
-          return {
-            jobs: [updatedJob, ...state.jobs],
-          };
-        });
+        set((state) => ({
+          jobs: upsertJob(state.jobs, updatedJob),
+        }));
       });
 
       window.dropzone.onDownloadCompleted((completedJob) => {
         set((state) => ({
-          jobs: state.jobs.map((j) => (j.id === completedJob.id ? completedJob : j)),
+          jobs: upsertJob(state.jobs, completedJob),
         }));
         get().showToast(`Finished download: ${completedJob.title}`, 'success');
         get().fetchHistory().catch(console.error);
@@ -329,7 +343,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       window.dropzone.onDownloadFailed((failedJob) => {
         set((state) => ({
-          jobs: state.jobs.map((j) => (j.id === failedJob.id ? failedJob : j)),
+          jobs: upsertJob(state.jobs, failedJob),
         }));
         get().showToast(`Download failed: ${failedJob.title}`, 'error');
         get().fetchHistory().catch(console.error);
@@ -561,8 +575,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (typeof window !== 'undefined' && window.dropzone) {
         const res = await window.dropzone.addJob(options);
         if (res.success && res.job) {
-          set((state) => ({ jobs: [res.job!, ...state.jobs] }));
-          get().showToast(`Added to queue: ${res.job.title}`, 'success');
+          const newJob = res.job;
+          set((state) => ({
+            jobs: upsertJob(state.jobs, newJob),
+          }));
+          get().showToast(`Added to queue: ${newJob.title}`, 'success');
           return true;
         }
       }

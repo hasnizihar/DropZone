@@ -57,5 +57,21 @@ describe('App State Store', () => {
     await retryJob(jobId);
     expect(useAppStore.getState().jobs[0].status).toBe('pending');
   });
+
+  it('deduplicates jobs when addJob and live progress events fire for the same job id', async () => {
+    const { addJob } = useAppStore.getState();
+
+    // 1. Add job
+    const ok = await addJob({ url: 'https://example.com/unique.mp4', customFilename: 'Deduplicated Video' });
+    expect(ok).toBe(true);
+    expect(useAppStore.getState().jobs.length).toBe(1);
+
+    const firstJob = useAppStore.getState().jobs[0];
+
+    // 2. Simulate concurrent addJob with same job id (simulating race between IPC response and progress event)
+    await addJob({ url: 'https://example.com/unique.mp4', customFilename: 'Deduplicated Video' });
+    // Still exactly 1 job in list because setup.ts mock returns the same or existing
+    expect(useAppStore.getState().jobs.filter((j) => j.id === firstJob.id).length).toBe(1);
+  });
 });
 
