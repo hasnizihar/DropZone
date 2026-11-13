@@ -27,6 +27,7 @@ import {
   HelpCircle,
   Loader2,
   RefreshCw,
+  ClipboardPaste,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import type { MediaFormat, PostProcessOptions } from '@dropzone/shared';
@@ -112,6 +113,20 @@ export const AnalyzerPage: React.FC = () => {
     setInputUrl('');
     setCustomFilename('');
     resetAnalysis();
+  };
+
+  const handlePaste = async () => {
+    try {
+      if (navigator?.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setInputUrl(text.trim());
+          showToast('info', 'Pasted URL from clipboard');
+        }
+      }
+    } catch (err) {
+      console.warn('Clipboard read error:', err);
+    }
   };
 
   const handleSelectFolder = async () => {
@@ -272,18 +287,29 @@ export const AnalyzerPage: React.FC = () => {
               onChange={(e) => setInputUrl(e.target.value)}
               placeholder="Paste any link (YouTube, Vimeo, Reddit, direct HTTP file, image, or gallery)..."
               disabled={isAnalyzing}
-              className="w-full bg-brand-black border border-brand-border rounded-lg pl-10 pr-10 py-3 text-sm text-brand-white placeholder-brand-grey focus:outline-none focus:border-brand-lime transition-colors disabled:opacity-50"
+              className="w-full bg-brand-black border border-brand-border rounded-lg pl-10 pr-20 py-3 text-sm text-brand-white placeholder-brand-grey focus:outline-none focus:border-brand-lime transition-colors disabled:opacity-50"
             />
-            {inputUrl && (
+            <div className="absolute inset-y-0 right-0 pr-2 flex items-center space-x-0.5">
               <button
                 type="button"
-                onClick={handleClear}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-brand-grey hover:text-brand-white"
-                title="Clear input"
+                onClick={handlePaste}
+                disabled={isAnalyzing}
+                className="p-1.5 text-brand-grey hover:text-brand-lime hover:bg-white/5 rounded transition-colors disabled:opacity-40"
+                title="Paste URL from clipboard"
               >
-                <X className="w-4 h-4" />
+                <ClipboardPaste className="w-4 h-4" />
               </button>
-            )}
+              {inputUrl && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="p-1.5 text-brand-grey hover:text-brand-white hover:bg-white/5 rounded transition-colors"
+                  title="Clear input"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
           <button
             type="submit"

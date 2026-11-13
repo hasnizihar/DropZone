@@ -13,6 +13,8 @@ import {
   ArrowRight,
   ExternalLink,
   Loader2,
+  ClipboardPaste,
+  X,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -31,6 +33,21 @@ export const DashboardPage: React.FC = () => {
   const isAnalyzing = useAppStore((state) => state.isAnalyzing);
   const jobs = useAppStore((state) => state.jobs);
   const systemInfo = useAppStore((state) => state.systemInfo);
+  const showToast = useAppStore((state) => state.showToast);
+
+  const handlePaste = async () => {
+    try {
+      if (navigator?.clipboard?.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          setInputUrl(text.trim());
+          showToast('info', 'Pasted URL from clipboard');
+        }
+      }
+    } catch (err) {
+      console.warn('Clipboard read error:', err);
+    }
+  };
 
   const activeJobs = jobs.filter(
     (j) => j.status === 'downloading' || j.status === 'pending'
@@ -77,8 +94,29 @@ export const DashboardPage: React.FC = () => {
               value={inputUrl}
               onChange={(e) => setInputUrl(e.target.value)}
               placeholder="Paste URL here (e.g. https://www.youtube.com/watch?v=... or direct file link)"
-              className="w-full bg-brand-black border border-brand-border rounded-lg pl-10 pr-4 py-3 text-sm text-brand-white placeholder-brand-grey focus:outline-none focus:border-brand-lime transition-colors"
+              className="w-full bg-brand-black border border-brand-border rounded-lg pl-10 pr-20 py-3 text-sm text-brand-white placeholder-brand-grey focus:outline-none focus:border-brand-lime transition-colors"
             />
+            <div className="absolute inset-y-0 right-0 pr-2 flex items-center space-x-0.5">
+              <button
+                type="button"
+                onClick={handlePaste}
+                disabled={isAnalyzing}
+                className="p-1.5 text-brand-grey hover:text-brand-lime hover:bg-white/5 rounded transition-colors disabled:opacity-40"
+                title="Paste URL from clipboard"
+              >
+                <ClipboardPaste className="w-4 h-4" />
+              </button>
+              {inputUrl && (
+                <button
+                  type="button"
+                  onClick={() => setInputUrl('')}
+                  className="p-1.5 text-brand-grey hover:text-brand-white hover:bg-white/5 rounded transition-colors"
+                  title="Clear input"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
           <button
             type="submit"
