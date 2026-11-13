@@ -83,7 +83,14 @@ class DownloadService:
         # 3. Output template
         clean_name = sanitize_filename(custom_filename) if custom_filename else None
         if clean_name:
-            outtmpl = os.path.join(abs_target_dir, f"{clean_name}.%(ext)s")
+            base, ext = os.path.splitext(clean_name)
+            if ext.lower() in (
+                ".mp4", ".mkv", ".webm", ".avi", ".mov", ".flv",
+                ".mp3", ".m4a", ".wav", ".flac", ".ogg", ".opus"
+            ):
+                outtmpl = os.path.join(abs_target_dir, f"{base}.%(ext)s")
+            else:
+                outtmpl = os.path.join(abs_target_dir, f"{clean_name}.%(ext)s")
         else:
             outtmpl = os.path.join(abs_target_dir, "%(title)s [%(id)s].%(ext)s")
 
@@ -172,7 +179,7 @@ class DownloadService:
             "no_warnings": True,
             "noprogress": True,
             "continuedl": True,
-            "overwrites": True,
+            "overwrites": False,
             "no_color": True,
             "socket_timeout": 30,
             "retries": 3,
@@ -221,6 +228,7 @@ class DownloadService:
                 "success": True,
                 "jobId": job_id,
                 "outputPath": final_path or outtmpl,
+                "filename": os.path.basename(final_path) if final_path else None,
                 "totalBytes": final_size,
             }
 

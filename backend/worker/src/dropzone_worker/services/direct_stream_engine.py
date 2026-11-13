@@ -3,7 +3,7 @@ import json
 import time
 import logging
 import threading
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Callable, Tuple
 import requests
 
 from .url_validator import validate_url, validate_redirect
@@ -19,6 +19,31 @@ from ..protocol.errors import WorkerProtocolError, ProtocolErrorCode
 logger = logging.getLogger("dropzone_worker")
 
 CHUNK_SIZE = 64 * 1024  # 64 KB
+
+def split_base_and_ext(filename: str) -> Tuple[str, str]:
+    clean = filename.strip()
+    compound_exts = [".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".part.meta.json"]
+    lower = clean.lower()
+    for c_ext in compound_exts:
+        if lower.endswith(c_ext):
+            base = clean[:-len(c_ext)]
+            return base or "download", clean[-len(c_ext):]
+    base, ext = os.path.splitext(clean)
+    return base or "download", ext
+
+def resolve_unique_filename(target_dir: str, desired_filename: str) -> str:
+    """Finds a collision-free filename in target_dir for completed or in-progress files."""
+    base, ext = split_base_and_ext(desired_filename)
+    candidate = f"{base}{ext}"
+    counter = 1
+    while (
+        os.path.exists(os.path.join(target_dir, candidate))
+        or os.path.exists(os.path.join(target_dir, f"{candidate}.part"))
+        or os.path.exists(os.path.join(target_dir, f"{candidate}.part.meta.json"))
+    ):
+        candidate = f"{base} ({counter}){ext}"
+        counter += 1
+    return candidate
 
 class DirectDownloadCancelled(Exception):
     """Raised when direct streaming is aborted cooperatively."""
@@ -99,9 +124,8 @@ class DirectStreamEngine:
                 candidate_meta_file = candidate_meta
                 part_path = candidate_part
                 meta_path = candidate_meta
-
-        if not candidate_meta_file:
-            # Check if any .part.meta.json in target_dir matches the URL
+        else:
+            # ONLY scan directory for partials if NO custom_filename was specified!
             try:
                 for fname in os.listdir(target_dir):
                     if fname.endswith(".part.meta.json"):
@@ -126,7 +150,9 @@ class DirectStreamEngine:
                 with open(candidate_meta_file, "r", encoding="utf-8") as mf:
                     saved_meta = json.load(mf)
                 if saved_meta.get("url") == url:
-                    final_filename = saved_meta.get("finalFilename") or final_filename or "download"
+                    # Do not let saved_meta override an explicitly given custom_filename
+                    if not final_filename:
+                        final_filename = saved_meta.get("finalFilename") or "download"
                     expected_total_bytes = saved_meta.get("expectedBytes")
                     etag = saved_meta.get("etag")
                     last_modified = saved_meta.get("lastModified")
@@ -141,7 +167,12 @@ class DirectStreamEngine:
         if not has_valid_resume_meta:
             inspect_res = self.http_service.inspect_url(url, check_dns=check_dns, allow_loopback=allow_loopback)
             remote_filename = inspect_res.get("filename") or "download"
-            final_filename = sanitize_filename(custom_filename or remote_filename)
+            raw_filename = sanitize_filename(custom_filename or remote_filename)
+            if not custom_filename:
+                # If custom_filename was not provided, ensure unique destination on disk
+                final_filename = resolve_unique_filename(target_dir, raw_filename)
+            else:
+                final_filename = raw_filename
             expected_total_bytes = inspect_res.get("fileSizeBytes")
             etag = inspect_res.get("etag")
             last_modified = inspect_res.get("lastModified")
@@ -496,6 +527,12 @@ class DirectStreamEngine:
                     ProtocolErrorCode.DOWNLOAD_FAILED,
                     f"Incomplete download: received {downloaded_bytes} of {total_bytes} bytes."
                 )
+
+            # Ensure we never overwrite an existing completed file on disk
+            if os.path.exists(final_output_path):
+                safe_name = resolve_unique_filename(target_dir, final_filename)
+                final_filename = safe_name
+                final_output_path = os.path.abspath(os.path.join(target_dir, final_filename))
 
             # Atomic rename to final output path
             os.replace(part_path, final_output_path)

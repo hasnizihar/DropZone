@@ -20,29 +20,85 @@ import { JobRepository } from '../database/JobRepository';
 
 export const CONTAINER_ENGINES = new Set<DownloadEngineType>(['image-gallery', 'playlist', 'batch']);
 
+export const WINDOWS_RESERVED_NAMES = new Set([
+  'CON', 'PRN', 'AUX', 'NUL',
+  'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+  'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+]);
+
 /**
- * Resolves a unique, collision-safe filename within a target directory and/or among items in a batch.
+ * Splits a filename into base stem and extension, preserving compound extensions (.tar.gz, etc.)
+ * and protecting Windows reserved device names and illegal trailing characters.
+ */
+export function splitBaseAndExt(filename: string): { base: string; ext: string } {
+  let cleanName = filename.trim().replace(/[\\/:*?"<>|\x00-\x1f]/g, '_');
+  cleanName = cleanName.replace(/[. ]+$/, '');
+  if (!cleanName) cleanName = 'download';
+
+  const lower = cleanName.toLowerCase();
+  const compoundExts = ['.tar.gz', '.tar.bz2', '.tar.xz', '.tar.zst', '.part.meta.json'];
+  for (const cExt of compoundExts) {
+    if (lower.endsWith(cExt)) {
+      let base = cleanName.slice(0, -cExt.length).trim().replace(/[. ]+$/, '');
+      if (!base) base = 'download';
+      if (WINDOWS_RESERVED_NAMES.has(base.toUpperCase())) {
+        base = `_${base}`;
+      }
+      return { base, ext: cleanName.slice(-cExt.length) };
+    }
+  }
+
+  const ext = path.extname(cleanName);
+  let base = path.basename(cleanName, ext).trim().replace(/[. ]+$/, '');
+  if (!base) base = 'download';
+  if (WINDOWS_RESERVED_NAMES.has(base.toUpperCase())) {
+    base = `_${base}`;
+  }
+  return { base, ext };
+}
+
+/**
+ * Resolves a unique, collision-safe filename within a target directory.
+ * Checks existing completed files, existing partial files (.part), and in-memory reservations.
  */
 export function resolveUniqueFilename(
   targetDir: string,
   desiredFilename: string,
   usedFilenames?: Set<string>
 ): string {
-  let cleanName = desiredFilename.trim().replace(/[\\/:*?"<>|]/g, '_');
-  if (!cleanName) cleanName = 'download';
+  const { base, ext } = splitBaseAndExt(desiredFilename);
 
-  const ext = path.extname(cleanName);
-  const base = path.basename(cleanName, ext);
-
-  let candidate = cleanName;
+  let candidate = `${base}${ext}`;
   let counter = 1;
 
   const isOccupied = (name: string) => {
-    if (usedFilenames && usedFilenames.has(name.toLowerCase())) {
-      return true;
+    const lower = name.toLowerCase();
+    if (usedFilenames) {
+      if (usedFilenames.has(lower)) return true;
+      if (!ext) {
+        for (const u of usedFilenames) {
+          if (u === lower || u.startsWith(`${lower}.`)) return true;
+        }
+      } else {
+        if (usedFilenames.has(base.toLowerCase())) return true;
+      }
     }
-    if (targetDir && fs.existsSync(path.join(targetDir, name))) {
-      return true;
+    if (targetDir && fs.existsSync(targetDir)) {
+      if (fs.existsSync(path.join(targetDir, name))) return true;
+      if (fs.existsSync(path.join(targetDir, `${name}.part`))) return true;
+      if (fs.existsSync(path.join(targetDir, `${name}.part.meta.json`))) return true;
+      if (!ext) {
+        try {
+          const files = fs.readdirSync(targetDir);
+          const lowerName = name.toLowerCase();
+          for (const f of files) {
+            const lowerF = f.toLowerCase();
+            if (lowerF === lowerName || lowerF.startsWith(`${lowerName}.`)) {
+              return true;
+            }
+          }
+        } catch {}
+      }
     }
     return false;
   };
@@ -69,6 +125,7 @@ export interface QueueManagerConfig {
 export class QueueManager extends EventEmitter {
   private jobs = new Map<string, DownloadJob>();
   private activeJobIds = new Set<string>();
+  private reservedFilenames = new Map<string, Map<string, string>>(); // normalized targetDir -> (lowerFilename -> jobId)
   private maxConcurrentDownloads: number;
   private autoStartDownloads: boolean;
   private defaultDownloadDir: string;
@@ -84,6 +141,64 @@ export class QueueManager extends EventEmitter {
     this.jobRepository = config.jobRepository;
 
     this.bindWorkerEvents();
+  }
+
+  /**
+   * Atomically reserves a unique destination filename in targetDir for a job.
+   * Checks filesystem, partial downloads, active/queued jobs, and active reservations.
+   */
+  public reserveUniqueFilename(targetDir: string, desiredFilename: string, jobId?: string): string {
+    const normalizedDir = path.resolve(targetDir);
+    const dirKey = normalizedDir.toLowerCase();
+
+    if (!this.reservedFilenames.has(dirKey)) {
+      this.reservedFilenames.set(dirKey, new Map<string, string>());
+    }
+    const dirReservations = this.reservedFilenames.get(dirKey)!;
+
+    // Collect all currently occupied names
+    const usedNames = new Set<string>();
+
+    // 1. In-memory reservations for this directory (excluding self if already holding it)
+    for (const [resName, resJobId] of dirReservations.entries()) {
+      if (jobId && resJobId === jobId) continue;
+      usedNames.add(resName.toLowerCase());
+    }
+
+    // 2. Active, pending, paused, or completed jobs targeting this directory
+    for (const j of this.jobs.values()) {
+      if (jobId && j.id === jobId) continue;
+      const jDir = path.resolve(j.targetDirectory || this.defaultDownloadDir);
+      if (jDir.toLowerCase() === dirKey) {
+        if (j.customFilename) {
+          usedNames.add(j.customFilename.toLowerCase());
+        }
+        if (j.outputPath) {
+          usedNames.add(path.basename(j.outputPath).toLowerCase());
+        }
+      }
+    }
+
+    const unique = resolveUniqueFilename(normalizedDir, desiredFilename, usedNames);
+
+    if (jobId) {
+      dirReservations.set(unique.toLowerCase(), jobId);
+    }
+
+    return unique;
+  }
+
+  /**
+   * Releases destination reservations held by a given job ID.
+   */
+  public releaseReservation(jobId: string): void {
+    for (const dirMap of this.reservedFilenames.values()) {
+      for (const [name, resJobId] of Array.from(dirMap.entries())) {
+        if (resJobId === jobId) {
+          dirMap.delete(name);
+        }
+      }
+    }
   }
 
   public setJobRepository(jobRepository: JobRepository): void {
@@ -119,6 +234,18 @@ export class QueueManager extends EventEmitter {
       }
 
       this.jobs.set(job.id, job);
+
+      // Re-register reservations for restored jobs so newly added downloads never collide
+      const targetDir = path.resolve(job.targetDirectory || this.defaultDownloadDir);
+      const dirKey = targetDir.toLowerCase();
+      if (!this.reservedFilenames.has(dirKey)) {
+        this.reservedFilenames.set(dirKey, new Map<string, string>());
+      }
+      const dirReservations = this.reservedFilenames.get(dirKey)!;
+      const fn = job.customFilename || (job.outputPath ? path.basename(job.outputPath) : undefined);
+      if (fn) {
+        dirReservations.set(fn.toLowerCase(), job.id);
+      }
     }
 
     // Reconcile parent aggregate states
@@ -284,7 +411,7 @@ export class QueueManager extends EventEmitter {
       for (const asset of selectedAssets) {
         const childId = `job_${parentId}_${asset.index}`;
         parentJob.childJobIds!.push(childId);
-        const filename = resolveUniqueFilename(parentJob.targetDirectory, asset.filename, usedNames);
+        const filename = this.reserveUniqueFilename(parentJob.targetDirectory, asset.filename, childId);
         const childJob: DownloadJob = {
           id: childId,
           parentJobId: parentId,
@@ -296,6 +423,7 @@ export class QueueManager extends EventEmitter {
           status: 'pending',
           targetDirectory: parentJob.targetDirectory,
           customFilename: filename,
+          outputPath: path.join(parentJob.targetDirectory, filename),
           thumbnail: asset.thumbnail,
           progress: 0,
           downloadedBytes: 0,
@@ -348,7 +476,7 @@ export class QueueManager extends EventEmitter {
         const childId = `job_${parentId}_${item.index}`;
         parentJob.childJobIds!.push(childId);
         const desiredName = `${item.index.toString().padStart(2, '0')} - ${item.title}`;
-        const filename = resolveUniqueFilename(parentJob.targetDirectory, desiredName, usedNames);
+        const filename = this.reserveUniqueFilename(parentJob.targetDirectory, desiredName, childId);
 
         const childJob: DownloadJob = {
           id: childId,
@@ -362,6 +490,7 @@ export class QueueManager extends EventEmitter {
           selectedFormatId: item.formatId || options.selectedFormatId || 'best',
           targetDirectory: parentJob.targetDirectory,
           customFilename: filename,
+          outputPath: path.join(parentJob.targetDirectory, filename),
           thumbnail: item.thumbnail,
           postProcess: options.postProcess || (options.extractAudio ? { action: 'extract_audio', audioFormat: options.audioFormat || 'mp3', audioBitrate: options.audioBitrate || '192k' } : undefined),
           progress: 0,
@@ -417,7 +546,7 @@ export class QueueManager extends EventEmitter {
 
         const targetDir = item.targetDirectory || parentJob.targetDirectory;
         const desiredName = item.customFilename || item.url.split('/').pop()?.split('?')[0] || `batch_item_${i + 1}`;
-        const filename = resolveUniqueFilename(targetDir, desiredName, usedNames);
+        const filename = this.reserveUniqueFilename(targetDir, desiredName, childId);
 
         const isImage = item.category === 'image' || /\.(jpe?g|png|gif|webp|svg|bmp|tiff|avif)($|\?)/i.test(item.url);
         const engine: DownloadEngineType = item.engine || (isImage ? 'direct-http' : (item.category === 'file' ? 'direct-http' : 'yt-dlp'));
@@ -434,6 +563,7 @@ export class QueueManager extends EventEmitter {
           selectedFormatId: item.selectedFormatId || 'best',
           targetDirectory: targetDir,
           customFilename: filename,
+          outputPath: path.join(targetDir, filename),
           postProcess: item.postProcess || (item.extractAudio ? { action: 'extract_audio', audioFormat: item.audioFormat || 'mp3', audioBitrate: item.audioBitrate || '192k' } : undefined),
           progress: 0,
           downloadedBytes: 0,
@@ -453,36 +583,27 @@ export class QueueManager extends EventEmitter {
     }
 
     // 4. Single Download Job
-    // Deduplication Guard: If an identical non-parent download is currently active or pending, return it
-    if (!options.parentJobId) {
-      const activeDuplicate = Array.from(this.jobs.values()).find(
-        (j) =>
-          !j.parentJobId &&
-          j.url === options.url &&
-          (j.status === 'downloading' || j.status === 'pending' || j.status === 'processing') &&
-          (j.selectedFormatId || 'best') === (options.selectedFormatId || 'best')
-      );
-      if (activeDuplicate) {
-        return activeDuplicate;
-      }
-    }
-
     const id = `job_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-    const filename = options.customFilename || options.url.split('/').pop()?.split('?')[0] || 'Download Job';
+    const targetDir = options.targetDirectory || this.defaultDownloadDir;
+    const urlFilename = options.url.split('/').pop()?.split('?')[0];
+    const desiredFilename = options.customFilename || (urlFilename && urlFilename.includes('.') ? urlFilename : options.customFilename) || 'Download Job';
+    const uniqueFilename = this.reserveUniqueFilename(targetDir, desiredFilename, id);
+
     const isImage = options.category === 'image' || /\.(jpe?g|png|gif|webp|svg|bmp|tiff|avif)($|\?)/i.test(options.url);
     const engine: DownloadEngineType = options.engine || (isImage ? 'direct-http' : (options.category === 'file' ? 'direct-http' : 'yt-dlp'));
 
     const newJob: DownloadJob = {
       id,
       url: options.url,
-      title: filename,
+      title: uniqueFilename,
       source: options.url.split('/')[2] || 'web',
       category: options.category || (isImage ? 'image' : (options.extractAudio ? 'file' : 'video')),
       engine,
       status: 'pending',
       selectedFormatId: options.selectedFormatId || 'best',
-      targetDirectory: options.targetDirectory || this.defaultDownloadDir,
-      customFilename: options.customFilename,
+      targetDirectory: targetDir,
+      customFilename: uniqueFilename,
+      outputPath: path.join(targetDir, uniqueFilename),
       parentJobId: options.parentJobId,
       postProcess: options.postProcess || (options.extractAudio ? { action: 'extract_audio', audioFormat: options.audioFormat || 'mp3', audioBitrate: options.audioBitrate || '192k' } : undefined),
       progress: 0,
@@ -656,6 +777,7 @@ export class QueueManager extends EventEmitter {
     job.speedBytesPerSec = 0;
     job.etaSeconds = null;
     job.updatedAt = new Date().toISOString();
+    this.releaseReservation(job.id);
     this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
     this.processQueue();
@@ -750,6 +872,16 @@ export class QueueManager extends EventEmitter {
     job.speedBytesPerSec = 0;
     job.etaSeconds = null;
     job.updatedAt = new Date().toISOString();
+
+    if (job.customFilename) {
+      const targetDir = path.resolve(job.targetDirectory || this.defaultDownloadDir);
+      const dirKey = targetDir.toLowerCase();
+      if (!this.reservedFilenames.has(dirKey)) {
+        this.reservedFilenames.set(dirKey, new Map<string, string>());
+      }
+      this.reservedFilenames.get(dirKey)!.set(job.customFilename.toLowerCase(), job.id);
+    }
+
     this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
     this.processQueue();
@@ -779,6 +911,7 @@ export class QueueManager extends EventEmitter {
       }
     }
 
+    this.releaseReservation(jobId);
     this.jobs.delete(jobId);
     this.jobRepository?.removeJob(jobId, false);
     this.emit('job-removed', jobId);
@@ -790,6 +923,7 @@ export class QueueManager extends EventEmitter {
     let count = 0;
     for (const [id, job] of this.jobs.entries()) {
       if (job.status === 'completed' || job.status === 'cancelled' || job.status === 'failed') {
+        this.releaseReservation(id);
         this.jobs.delete(id);
         count++;
       }
@@ -961,6 +1095,16 @@ export class QueueManager extends EventEmitter {
     job.speedBytesPerSec = 0;
     job.etaSeconds = 0;
     job.outputPath = payload.outputPath;
+    if (payload.outputPath) {
+      const actualFn = path.basename(payload.outputPath);
+      job.customFilename = actualFn;
+      const targetDir = path.resolve(job.targetDirectory || this.defaultDownloadDir);
+      const dirKey = targetDir.toLowerCase();
+      if (!this.reservedFilenames.has(dirKey)) {
+        this.reservedFilenames.set(dirKey, new Map<string, string>());
+      }
+      this.reservedFilenames.get(dirKey)!.set(actualFn.toLowerCase(), job.id);
+    }
     job.completedAt = new Date().toISOString();
     job.updatedAt = new Date().toISOString();
 
@@ -1005,6 +1149,16 @@ export class QueueManager extends EventEmitter {
     job.speedBytesPerSec = 0;
     job.etaSeconds = 0;
     job.outputPath = payload.outputPath;
+    if (payload.outputPath) {
+      const actualFn = path.basename(payload.outputPath);
+      job.customFilename = actualFn;
+      const targetDir = path.resolve(job.targetDirectory || this.defaultDownloadDir);
+      const dirKey = targetDir.toLowerCase();
+      if (!this.reservedFilenames.has(dirKey)) {
+        this.reservedFilenames.set(dirKey, new Map<string, string>());
+      }
+      this.reservedFilenames.get(dirKey)!.set(actualFn.toLowerCase(), job.id);
+    }
     if (payload.totalBytes > 0) {
       job.totalBytes = payload.totalBytes;
       job.downloadedBytes = payload.totalBytes;
@@ -1085,6 +1239,7 @@ export class QueueManager extends EventEmitter {
     job.etaSeconds = null;
     job.updatedAt = new Date().toISOString();
 
+    this.releaseReservation(job.id);
     this.activeJobIds.delete(job.id);
     this.jobRepository?.saveJob(job);
     this.emit('job-updated', job);
