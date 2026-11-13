@@ -187,6 +187,28 @@ class DirectStreamEngine:
                     resp.close()
                     continue
 
+                # Fallback User-Agent if 401/403
+                if resp.status_code in (401, 403):
+                    for alt_ua in getattr(self.http_service, "FALLBACK_USER_AGENTS", []):
+                        if alt_ua == session.headers.get("User-Agent"):
+                            continue
+                        try:
+                            headers_alt = dict(headers)
+                            headers_alt["User-Agent"] = alt_ua
+                            alt_resp = session.get(
+                                current_req_url,
+                                headers=headers_alt,
+                                stream=True,
+                                timeout=20,
+                                allow_redirects=False,
+                            )
+                            if alt_resp.status_code < 400:
+                                resp = alt_resp
+                                session.headers["User-Agent"] = alt_ua
+                                break
+                        except Exception:
+                            pass
+
                 response = resp
                 break
 

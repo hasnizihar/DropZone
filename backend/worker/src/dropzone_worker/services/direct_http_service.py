@@ -76,11 +76,16 @@ def classify_content_type(mime_type: str, filename: str) -> str:
 class DirectHttpService:
     DEFAULT_HEADERS = {
         "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 DROPZONE/1.0"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0"
         ),
-        "Accept": "*/*",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
     }
+
+    FALLBACK_USER_AGENTS = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+    ]
 
     def __init__(self, timeout: float = 12.0, max_redirects: int = 5):
         self.timeout = timeout
@@ -106,7 +111,8 @@ class DirectHttpService:
                     timeout=self.timeout,
                     allow_redirects=False,
                 )
-                if head_resp.status_code not in (405, 501):
+                # Some servers/CDNs reject HEAD with 401, 403, 404, 405, or 501 while allowing GET
+                if head_resp.status_code not in (401, 403, 404, 405, 501):
                     resp = head_resp
             except requests.RequestException:
                 resp = None
@@ -125,6 +131,26 @@ class DirectHttpService:
                         ProtocolErrorCode.NETWORK_ERROR,
                         f"Failed to connect to '{current_url}': {exc}"
                     )
+
+            # 3. If forbidden/unauthorized, try fallback User-Agents (e.g. against CDN bot blockers)
+            if resp.status_code in (401, 403):
+                for alt_ua in self.FALLBACK_USER_AGENTS:
+                    if alt_ua == session.headers.get("User-Agent"):
+                        continue
+                    try:
+                        alt_resp = session.get(
+                            current_url,
+                            headers={"User-Agent": alt_ua},
+                            timeout=self.timeout,
+                            allow_redirects=False,
+                            stream=True,
+                        )
+                        if alt_resp.status_code < 400:
+                            resp = alt_resp
+                            session.headers["User-Agent"] = alt_ua
+                            break
+                    except Exception:
+                        pass
 
             # Check for redirect status
             if resp.status_code in (301, 302, 303, 307, 308):

@@ -1,0 +1,350 @@
+[
+  {
+    "platform": "Direct HTTP (W3C PDF)",
+    "group": "Direct File & Cloud",
+    "url": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    "engine": "direct-http",
+    "status": "Download Verified End-to-End",
+    "extraction": {
+      "success": true,
+      "durationMs": 1792,
+      "downloadType": "file",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "dummy.pdf"
+    },
+    "download": {
+      "success": true,
+      "durationMs": 581,
+      "fileInfo": {
+        "path": "D:\\INDEX\\DropZone\\tmp_e2e_downloads\\test_download_1.pdf",
+        "filename": "test_download_1.pdf",
+        "sizeBytes": 13264,
+        "format": "pdf",
+        "integrity": true,
+        "headerHex": "255044462d312e340a25c3a4c3bcc3b6"
+      }
+    },
+    "error": null,
+    "durationMs": 2373,
+    "notes": "Direct PDF stream from w3.org Akamai CDN (previously failed manual test)"
+  },
+  {
+    "platform": "Direct HTTP (Public Mirror PDF)",
+    "group": "Direct File & Cloud",
+    "url": "https://filesamples.com/samples/document/pdf/sample3.pdf",
+    "engine": "direct-http",
+    "status": "Download Verified End-to-End",
+    "extraction": {
+      "success": true,
+      "durationMs": 1574,
+      "downloadType": "file",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "sample3.pdf"
+    },
+    "download": {
+      "success": true,
+      "durationMs": 2472,
+      "fileInfo": {
+        "path": "D:\\INDEX\\DropZone\\tmp_e2e_downloads\\test_download_2.pdf",
+        "filename": "test_download_2.pdf",
+        "sizeBytes": 1253607,
+        "format": "pdf",
+        "integrity": true,
+        "headerHex": "255044462d312e350d0a25b5b5b5b50d"
+      }
+    },
+    "error": null,
+    "durationMs": 4046,
+    "notes": "Direct PDF document stream with resume support"
+  },
+  {
+    "platform": "GitHub (Master Archive ZIP)",
+    "group": "Direct File & Cloud",
+    "url": "https://github.com/hasnizihar/dropzone/archive/refs/heads/master.zip",
+    "engine": "direct-http",
+    "status": "Download Verified End-to-End",
+    "extraction": {
+      "success": true,
+      "durationMs": 5680,
+      "downloadType": "file",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "DropZone-master.zip"
+    },
+    "download": {
+      "success": true,
+      "durationMs": 4276,
+      "fileInfo": {
+        "path": "D:\\INDEX\\DropZone\\tmp_e2e_downloads\\test_download_3.zip",
+        "filename": "test_download_3.zip",
+        "sizeBytes": 442265,
+        "format": "zip",
+        "integrity": true,
+        "headerHex": "504b03040a000000000078a96c5d0000"
+      }
+    },
+    "error": null,
+    "durationMs": 9956,
+    "notes": "Direct repository archive stream with Content-Length chunking"
+  },
+  {
+    "platform": "Internet Archive (MP3 Audio)",
+    "group": "Direct File & Cloud",
+    "url": "https://archive.org/download/testmp3testfile/mpthreetest.mp3",
+    "engine": "yt-dlp",
+    "status": "Metadata Extraction Tested",
+    "extraction": {
+      "success": true,
+      "durationMs": 5022,
+      "downloadType": "media",
+      "formatsCount": 1,
+      "assetsCount": 0,
+      "title": "mpthreetest"
+    },
+    "download": {
+      "success": false,
+      "durationMs": 6743,
+      "fileInfo": {
+        "path": "D:\\INDEX\\DropZone\\tmp_e2e_downloads\\mpthreetest [mpthreetest].mp3",
+        "filename": "mpthreetest [mpthreetest].mp3",
+        "sizeBytes": 198658,
+        "format": "mp3",
+        "integrity": false,
+        "headerHex": "fffa90c068f600019605811c27b0d18b"
+      }
+    },
+    "error": "Integrity check failed: Magic bytes mismatch for .mp3: header starts with b\"\\xff\\xfa\\x90\\xc0h\\xf6\\x00\\x01\\x96\\x05\\x81\\x1c'\\xb0\\xd1\\x8b\"",
+    "durationMs": 11765,
+    "notes": "Public domain audio stream hosted on archive.org"
+  },
+  {
+    "platform": "YouTube (Shorts Video)",
+    "group": "Video Platforms",
+    "url": "https://youtube.com/shorts/aBBXver4zxQ",
+    "engine": "yt-dlp",
+    "status": "Download Verified End-to-End",
+    "extraction": {
+      "success": true,
+      "durationMs": 3188,
+      "downloadType": "media",
+      "formatsCount": 45,
+      "assetsCount": 0,
+      "title": "Is EffectCraft better than After Effects? The REALITY"
+    },
+    "download": {
+      "success": true,
+      "durationMs": 4755,
+      "fileInfo": {
+        "path": "D:\\INDEX\\DropZone\\tmp_e2e_downloads\\Is EffectCraft better than After Effects\uff1f The REALITY [aBBXver4zxQ].webm",
+        "filename": "Is EffectCraft better than After Effects\uff1f The REALITY [aBBXver4zxQ].webm",
+        "sizeBytes": 11047988,
+        "format": "webm",
+        "integrity": true,
+        "headerHex": "1a45dfa39f4286810142f7810142f281"
+      }
+    },
+    "error": null,
+    "durationMs": 7943,
+    "notes": "Short-form vertical video; DASH video+audio merging"
+  },
+  {
+    "platform": "Vimeo (Player Embed)",
+    "group": "Video Platforms",
+    "url": "https://player.vimeo.com/video/76979871",
+    "engine": "yt-dlp",
+    "status": "Metadata Extraction Tested",
+    "extraction": {
+      "success": true,
+      "durationMs": 2902,
+      "downloadType": "media",
+      "formatsCount": 8,
+      "assetsCount": 0,
+      "title": "The New Vimeo Player (You Know, For Videos)"
+    },
+    "download": {
+      "success": false,
+      "durationMs": 3102,
+      "fileInfo": {}
+    },
+    "error": "Download failed: This format is DRM protected; Try selecting another format with --format or add --check-formats to automatically fallback to the next best format",
+    "durationMs": 6004,
+    "notes": "Public Vimeo staff pick via player embed without web client login wall"
+  },
+  {
+    "platform": "Vimeo (Web Client)",
+    "group": "Video Platforms",
+    "url": "https://vimeo.com/76979871",
+    "engine": "yt-dlp",
+    "status": "Authentication Required",
+    "extraction": {
+      "success": false,
+      "durationMs": 2310,
+      "downloadType": "unknown",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "Unknown"
+    },
+    "download": {
+      "success": false,
+      "durationMs": 0,
+      "fileInfo": {}
+    },
+    "error": "[vimeo] 76979871: The web client only works when logged-in. Use --cookies, --cookies-from-browser, --username and --password, --netrc-cmd, or --netrc (vimeo) to provide account credentials. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies",
+    "durationMs": 2310,
+    "notes": "Direct web client URL; test login requirement wall"
+  },
+  {
+    "platform": "TikTok (Public Video)",
+    "group": "Video Platforms",
+    "url": "https://www.tiktok.com/@tiktok/video/7106594312292453675",
+    "engine": "yt-dlp",
+    "status": "Download Verified End-to-End",
+    "extraction": {
+      "success": true,
+      "durationMs": 1155,
+      "downloadType": "media",
+      "formatsCount": 14,
+      "assetsCount": 0,
+      "title": "how many frogs did you find? \ud83d\udc38 check out tiktok\u2019s #Minecraft"
+    },
+    "download": {
+      "success": true,
+      "durationMs": 4055,
+      "fileInfo": {
+        "path": "D:\\INDEX\\DropZone\\tmp_e2e_downloads\\how many frogs did you find\uff1f \ud83d\udc38 check out tiktok\u2019s #Minecraft communit... [7106594312292453675].mp4",
+        "filename": "how many frogs did you find\uff1f \ud83d\udc38 check out tiktok\u2019s #Minecraft communit... [7106594312292453675].mp4",
+        "sizeBytes": 3360445,
+        "format": "mp4",
+        "integrity": true,
+        "headerHex": "0000001c6674797069736f6d00000200"
+      }
+    },
+    "error": null,
+    "durationMs": 5210,
+    "notes": "Public TikTok video without watermark"
+  },
+  {
+    "platform": "Instagram (Public Reel / Video)",
+    "group": "Video Platforms",
+    "url": "https://www.instagram.com/p/CQgFKYBh4HX/?hl=en",
+    "engine": "yt-dlp",
+    "status": "Download Verified End-to-End",
+    "extraction": {
+      "success": true,
+      "durationMs": 2723,
+      "downloadType": "media",
+      "formatsCount": 2,
+      "assetsCount": 0,
+      "title": "Video by template.engineer"
+    },
+    "download": {
+      "success": true,
+      "durationMs": 3746,
+      "fileInfo": {
+        "path": "D:\\INDEX\\DropZone\\tmp_e2e_downloads\\Video by template.engineer [CQgFKYBh4HX].mp4",
+        "filename": "Video by template.engineer [CQgFKYBh4HX].mp4",
+        "sizeBytes": 360037,
+        "format": "mp4",
+        "integrity": true,
+        "headerHex": "000000206674797069736f6d00000200"
+      }
+    },
+    "error": null,
+    "durationMs": 6469,
+    "notes": "Public Instagram video post; DASH stream extraction"
+  },
+  {
+    "platform": "Reddit (Public Post Video)",
+    "group": "Other Media Platforms",
+    "url": "https://www.reddit.com/r/aww/comments/1czk3b9/tiny_kitten/",
+    "engine": "yt-dlp",
+    "status": "Authentication Required",
+    "extraction": {
+      "success": false,
+      "durationMs": 4102,
+      "downloadType": "unknown",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "Unknown"
+    },
+    "download": {
+      "success": false,
+      "durationMs": 0,
+      "fileInfo": {}
+    },
+    "error": "[Reddit] 1czk3b9: Account authentication is required. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies",
+    "durationMs": 4102,
+    "notes": "Public Reddit post; tests session wall vs authentication requirement"
+  },
+  {
+    "platform": "Pinterest (Public Pin)",
+    "group": "Gallery & Images",
+    "url": "https://www.pinterest.com/pin/993606736517855325/",
+    "engine": "gallery-dl / yt-dlp",
+    "status": "Unsupported",
+    "extraction": {
+      "success": false,
+      "durationMs": 2997,
+      "downloadType": "unknown",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "Unknown"
+    },
+    "download": {
+      "success": false,
+      "durationMs": 0,
+      "fileInfo": {}
+    },
+    "error": "[Pinterest] 993606736517855325: No video formats found!; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U",
+    "durationMs": 2997,
+    "notes": "Public image pin"
+  },
+  {
+    "platform": "Flickr (Public Photo)",
+    "group": "Gallery & Images",
+    "url": "https://www.flickr.com/photos/nasa-hq/53066467067/",
+    "engine": "gallery-dl",
+    "status": "Unsupported",
+    "extraction": {
+      "success": false,
+      "durationMs": 4330,
+      "downloadType": "unknown",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "Unknown"
+    },
+    "download": {
+      "success": false,
+      "durationMs": 0,
+      "fileInfo": {}
+    },
+    "error": "[Flickr] 53066467067: Unable to download JSON metadata: HTTP Error 502: Bad Gateway (caused by <HTTPError 502: Bad Gateway>)",
+    "durationMs": 4330,
+    "notes": "Flickr photo stream (test asset expiration & gallery-dl extractor)"
+  },
+  {
+    "platform": "Dropbox (Public Shared File)",
+    "group": "Direct File & Cloud",
+    "url": "https://www.dropbox.com/s/sample/test.pdf?dl=1",
+    "engine": "direct-http",
+    "status": "Unsupported",
+    "extraction": {
+      "success": false,
+      "durationMs": 1615,
+      "downloadType": "unknown",
+      "formatsCount": 0,
+      "assetsCount": 0,
+      "title": "Unknown"
+    },
+    "download": {
+      "success": false,
+      "durationMs": 0,
+      "fileInfo": {}
+    },
+    "error": "[Dropbox] sample: No video formats found!; please report this issue on  https://github.com/yt-dlp/yt-dlp/issues?q= , filling out the appropriate issue template. Confirm you are on the latest version using  yt-dlp -U",
+    "durationMs": 1615,
+    "notes": "Dropbox shared link with direct dl=1 parameter"
+  }
+]

@@ -27,7 +27,16 @@ class GalleryService:
         """Checks if gallery-dl has an extractor registered for this URL."""
         try:
             from gallery_dl import extractor
-            return extractor.find(url) is not None
+            ext = extractor.find(url)
+            if ext is None:
+                return False
+            category = (getattr(ext, "category", "") or "").lower()
+            ext_name = type(ext).__name__.lower()
+            # DirectlinkExtractor is a catch-all fallback for arbitrary URLs.
+            # Reject directlink so direct files (PDF, ZIP, direct media) route to DirectHttpService.
+            if "directlink" in category or "directlink" in ext_name:
+                return False
+            return True
         except Exception:
             return False
 
