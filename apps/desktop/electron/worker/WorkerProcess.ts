@@ -147,9 +147,17 @@ export class WorkerProcess {
     // In development mode, prefer Python source unless DROPZONE_FORCE_STANDALONE is explicitly set.
     const preferStandalone = isPackaged || process.env.DROPZONE_FORCE_STANDALONE === 'true';
 
+    const baseEnv = {
+      ...process.env,
+      PYTHONIOENCODING: 'utf-8',
+      PYTHONUTF8: '1',
+      PYTHONUNBUFFERED: '1',
+    };
+
     if (standaloneBinary && preferStandalone) {
       this.proc = spawn(standaloneBinary, [], {
         cwd: path.dirname(standaloneBinary),
+        env: baseEnv,
         shell: false,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
@@ -165,9 +173,8 @@ export class WorkerProcess {
       const workerSrc = path.join(workerRoot, 'src');
 
       const env = {
-        ...process.env,
+        ...baseEnv,
         PYTHONPATH: workerSrc,
-        PYTHONUNBUFFERED: '1',
       };
 
       this.proc = spawn(pythonExecutable, ['-m', 'dropzone_worker'], {

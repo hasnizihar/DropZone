@@ -1,6 +1,18 @@
 import sys
 import logging
 import threading
+
+# Enforce UTF-8 standard streams across Windows environments on import
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stdin, "reconfigure"):
+        sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 from .utils.logging_config import setup_worker_logging
 from .protocol.models import create_event, create_error
 from .protocol.parser import parse_incoming_line
@@ -17,12 +29,18 @@ def write_stdout_message(msg) -> None:
     """
     Writes a single protocol message to stdout with trailing newline and flushes immediately.
     Thread-safe to prevent interleaved messages from concurrent tasks.
+    Guarantees pure UTF-8 encoding across Windows console code pages (supports emojis, CJK, symbols).
     """
     try:
         raw_json = serialize_message(msg)
+        payload_bytes = (raw_json + "\n").encode("utf-8")
         with stdout_lock:
-            sys.stdout.write(raw_json + "\n")
-            sys.stdout.flush()
+            if hasattr(sys.stdout, "buffer") and sys.stdout.buffer is not None:
+                sys.stdout.buffer.write(payload_bytes)
+                sys.stdout.buffer.flush()
+            else:
+                sys.stdout.write(raw_json + "\n")
+                sys.stdout.flush()
     except Exception as exc:
         sys.stderr.write(f"[DROPZONE_WORKER ERROR] Failed writing to stdout: {exc}\n")
         sys.stderr.flush()
@@ -31,6 +49,17 @@ def run() -> int:
     """
     Main entry point for DROPZONE worker execution.
     """
+    # Enforce UTF-8 standard streams across Windows environments
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stdin, "reconfigure"):
+            sys.stdin.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
     logger = setup_worker_logging(logging.INFO)
     logger.info(f"Starting DROPZONE Worker v{__version__} (Protocol v{PROTOCOL_VERSION})...")
 

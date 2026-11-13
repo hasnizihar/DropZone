@@ -90,9 +90,12 @@ class DownloadService:
         # 4. Format selector
         if extract_audio:
             format_spec = "bestaudio/best"
-        elif format_id and format_id != "best":
-            # For video-only formats, try merging bestaudio if ffmpeg is available
-            format_spec = f"{format_id}+bestaudio/best" if format_id.isdigit() else format_id
+        elif format_id and format_id not in ("best", "auto"):
+            # For video-only or DASH streams, merge bestaudio with fallback to format_id
+            if "+bestaudio" in format_id or "audio" in format_id.lower() or (format_id.startswith("dash-") and format_id.endswith("a")):
+                format_spec = format_id
+            else:
+                format_spec = f"{format_id}+bestaudio/best/{format_id}"
         else:
             format_spec = "bestvideo+bestaudio/best"
 
