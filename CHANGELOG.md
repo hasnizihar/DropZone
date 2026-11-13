@@ -16,8 +16,17 @@ All notable changes to the DROPZONE project will be documented in this file.
   - Added `CONTRIBUTING.md` detailing development setup, code of conduct, testing requirements, and PR workflows.
   - Added GitHub issue templates (`.github/ISSUE_TEMPLATE/bug_report.md`, `feature_request.md`) and pull request template (`.github/PULL_REQUEST_TEMPLATE.md`).
 - **UI & Documentation Updates**:
-  - Updated `README.md` with explicit MIT licensing terms, third-party companion license notices, and ethical use boundaries.
+  - Rewrote user-first `README.md` with official identity, prominent Windows download table, features overview, 3-step walkthrough, accurate project architecture diagram, and external FFmpeg installation guide.
+  - Eliminated broken local `file:///` links in documentation with proper relative GitHub markdown links.
+  - Created `docs/SCREENSHOTS.md` with official visual capture specifications and 6 core view checklists.
+  - Created `docs/RELEASE_CHECKSUMS.md` documenting verifiable cryptographic SHA-256 hashes for release packages.
   - Updated `AboutPage.tsx` with publisher attribution and open-source license information.
+- **Continuous Integration & Automated Testing Pipeline**:
+  - Added `.github/workflows/ci.yml` with multi-job GitHub Actions workflow covering Python 3.12 pytest, Node.js 22 Vitest tests, TypeScript validation, and production build checks.
+- **Repository Architecture & Packaging Cleanliness**:
+  - Removed deprecated empty `packages/database` directory to synchronize tree with `packages/shared` and `apps/desktop/electron/database`.
+  - Harmonized release version numbers across all package descriptors (`1.0.0-alpha.11`).
+  - Packaged official Windows distribution artifacts (`DROPZONE-Setup-1.0.0-alpha.11-x64.exe` and `DROPZONE-Portable-1.0.0-alpha.11-x64.exe`).
 
 ## [1.0.0-alpha.10] - 2026-11-13
 

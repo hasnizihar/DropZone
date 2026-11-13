@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  backend-tests:
+    name: Backend Tests (Python 3.12)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest requests psutil pydantic yt-dlp gallery-dl pyinstaller
+
+      - name: Run worker test suite
+        run: |
+          python -m pytest backend/worker/tests -v
+
+  frontend-tests:
+    name: Frontend Tests & Typechecks (Node.js 22)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Typecheck @dropzone/shared
+        run: npm run typecheck --workspace=@dropzone/shared
+
+      - name: Typecheck @dropzone/desktop
+        run: npm run typecheck --workspace=@dropzone/desktop
+
+      - name: Run Vitest unit & integration tests
+        run: npm test
+
+  build-verification:
+    name: Production Build Verification
+    needs: [backend-tests, frontend-tests]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build production bundles
+        run: npm run build
+

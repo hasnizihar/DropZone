@@ -210,3 +210,20 @@ This document tracks progress through the 10 core milestones defined in the DROP
   - Updated `README.md` with explicit MIT license terms, third-party companion license notices, and ethical use boundaries.
   - Updated `AboutPage.tsx` to surface publisher attribution and MIT license details.
   - Re-verified all test suites (Pytest, Vitest, TypeScript, production builds, and smoke tests).
+
+---
+
+## Milestone 12: Final Release Audit & Public Launch Readiness
+- **Status:** Complete (2026-11-13)
+- **Scope:**
+  - Conducted comprehensive, evidence-based quality audit of DROPZONE across repository, source code, packaging, legal attribution, and release readiness.
+  - Resolved version synchronization mismatch, aligning workspace descriptors to unified release version `1.0.0-alpha.11` across root `package.json`, `apps/desktop/package.json`, and `packages/shared/package.json`.
+  - Cleaned repository structure by removing dead placeholder directory `packages/database`, standardizing all SQLite persistence in `apps/desktop/electron/database/`.
+  - Rewrote user-first `README.md` with official identity, prominent Windows download table, features overview, 3-step walkthrough, accurate project architecture diagram, external FFmpeg installation guide (`winget install Gyan.FFmpeg`), SmartScreen/SAC explanation, and eliminated broken local `file:///` links with valid relative markdown links.
+  - Created `docs/SCREENSHOTS.md` with official visual capture specifications and 6 core view checklists.
+  - Created `.github/workflows/ci.yml` establishing multi-job CI pipeline on Windows (Python 3.12 pytest, Node 22 typecheck & Vitest tests, and production build verification).
+  - Created `docs/RELEASE_CHECKSUMS.md` documenting official SHA-256 cryptographic hashes for verifiable releases.
+  - Re-verified third-party GPL/MIT license compatibility: verified bundled `gallery-dl` compliance via source distribution under `backend/worker/` and attribution in `THIRD_PARTY_NOTICES.md`.
+  - Rebuilt packaged Windows distribution artifacts (`DROPZONE-Setup-1.0.0-alpha.11-x64.exe` and `DROPZONE-Portable-1.0.0-alpha.11-x64.exe`).
+  - Executed full verification suite: 56/56 Python tests passing, 83/83 Vitest tests passing, clean TypeScript checks, successful Electron runtime smoke test, and packaged application smoke test.
+  - Created authoritative release audit report `Plan/p1.0.12-final-audit.md` declaring official verdict: `READY FOR PUBLIC ALPHA`.

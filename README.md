@@ -1,164 +1,208 @@
-# DROPZONE
+<p align="center">
+  <img src="resources/icons/DropZone%20Icon.png" alt="DROPZONE Logo" width="128" height="128" />
+</p>
 
-**Universal Desktop Download Manager**
+<h1 align="center">DROPZONE</h1>
 
-DROPZONE is a high-performance, modular desktop application designed for downloading, managing, and converting media and files from a wide range of online sources. Engineered with a Windows-first architecture, a dark minimalist aesthetic, and robust error recovery, DROPZONE integrates state-of-the-art download engines under a unified interface.
+<p align="center">
+  <strong>Universal Desktop Download Manager for Windows</strong>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="License: MIT" /></a>
+  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-warmwhite?style=flat-square&labelColor=121417&color=F5F3EF" alt="Platform: Windows 10/11 x64" />
+  <img src="https://img.shields.io/badge/Version-v1.0.0--alpha.11-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="Version: 1.0.0-alpha.11" />
+  <img src="https://img.shields.io/badge/Architecture-Electron%20%7C%20React%20%7C%20Python-graphite?style=flat-square&labelColor=121417&color=858B93" alt="Architecture" />
+  <img src="https://img.shields.io/badge/Privacy-Zero%20Telemetry-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="Zero Telemetry" />
+</p>
+
+<p align="center">
+  A free, open-source Windows download manager for media and files. Inspect streams, download, organize, batch process, and convert content with a fast, private, local-first interface.
+</p>
 
 ---
 
-## Key Features
+## Download DROPZONE
 
-- **Universal Media Engine**: Integrates `yt-dlp` and dedicated HTTP streaming engines with automatic provider detection.
-- **Deep Format Inspection**: Inspect any media URL to extract available resolutions, video bitrates, audio codecs, and file sizes.
-- **Direct & Gallery Extraction**: High-throughput direct HTTP/HTTPS streaming with pause/resume support, chunked transfers, and image gallery bulk extraction.
-- **Playlist & Batch Processing**: Bounded inspection of media playlists (up to 200 items) and multi-URL batch ingestion (up to 50 URLs via paste or text/csv upload) with independent parallel analysis, parent-child queue architecture, selective item downloading, and partial failure retry.
-- **Queue & Concurrency Management**: Authoritative job state machine (`pending`, `analyzing`, `ready`, `downloading`, `paused`, `completed`, `failed`, `cancelled`) with configurable concurrency (default: 3).
-- **FFmpeg Post-Processing & Audio Extraction**: Audio extraction (MP3, M4A, WAV, FLAC, OPUS) with selectable bitrates, video remuxing (MP4, MKV, WebM, MOV) with stream copying, audio/video stream merging, metadata tagging, and cover art embedding.
-- **SQLite Settings & Download History**: Durable local-first SQLite persistence (`dropzone.db`) via WebAssembly, versioned migrations, startup queue hydration & crash recovery, preferences persistence with factory reset, and searchable, filterable, paginated download history.
-- **Hardened Fault-Tolerance & Reliability**: Terminal state idempotency, late worker event shields, concurrent database save serialization, network error normalization, and SSRF/redirect defense regression verification.
-- **Local-First & Secure**: Strict Electron sandboxing, context isolation, zero remote telemetry, local SQLite persistence, and path traversal protection.
+Official release binaries for Windows (64-bit) are available directly from the [GitHub Releases](https://github.com/hasnizihar/DropZone/releases) page:
+
+| Package Type | Version | Direct Asset Link | Description |
+| :--- | :--- | :--- | :--- |
+| **Windows Installer** | `1.0.0-alpha.11` | [DROPZONE-Setup-1.0.0-alpha.11-x64.exe](https://github.com/hasnizihar/DropZone/releases/latest) | Full setup wizard with Desktop & Start Menu shortcuts. Safe updates and uninstallation. |
+| **Portable Executable** | `1.0.0-alpha.11` | [DROPZONE-Portable-1.0.0-alpha.11-x64.exe](https://github.com/hasnizihar/DropZone/releases/latest) | Zero-install standalone binary. Runs immediately with no administrator privileges needed. |
+
+> [!TIP]
+> **Verifying Checksums**: Cryptographic SHA-256 hashes for all official packages are published in [docs/RELEASE_CHECKSUMS.md](docs/RELEASE_CHECKSUMS.md). You can verify your download in PowerShell with `Get-FileHash -Algorithm SHA256 <filename>`.
 
 ---
 
-## Design System & Brand Identity
+## Why DROPZONE?
 
-DROPZONE is built with a restrained, high-contrast dark aesthetic:
-- **Near Black** (`#121417` - 45%): Core application background and deep surface layers.
-- **Warm Off-White** (`#F5F3EF` - 35%): High-readability headings, active text, and high-contrast data readouts.
-- **Acid Lime** (`#D4FF5C` - 15%): Primary action buttons, active navigation markers, download progress indicators, and selected states.
-- **Graphite Grey** (`#858B93` - 5%): Subtle borders, secondary labels, and neutral status indicators.
+Most download utilities are bloated, ad-ridden, or stream user activity to cloud servers. DROPZONE is engineered around a different philosophy:
+
+- **100% Local-First & Private**: Zero remote telemetry, zero third-party analytics, and zero required user accounts. Your download queue, history, and preferences stay strictly on your machine in a local SQLite database (`dropzone.db`).
+- **Deep Format Inspection**: Paste any video or stream URL to inspect available resolutions (4K, 1440p, 1080p, 720p), video bitrates, audio codecs, and file sizes before initiating a download.
+- **Dual-Engine Architecture**: Seamlessly handles direct HTTP/HTTPS files with pause/resume and chunked transfers, alongside rich streaming media powered by a self-contained companion worker (`yt-dlp` & `gallery-dl`).
+- **Batch & Playlist Ingestion**: Ingest complete media playlists (up to 200 items) or batch queues of up to 50 URLs via plain text or CSV import, with parallel analysis and per-item controls.
+- **Audio Conversion & Remuxing**: Convert video to pure audio (MP3, M4A, FLAC, WAV, OPUS) with selectable bitrates (128k to 320k) or remux video containers (MP4, MKV, WebM) on the fly using FFmpeg.
+- **Crash Recovery & Queue Resilience**: If your system reboots or the application crashes, active and pending downloads are preserved in SQLite and restored automatically on next launch.
+
+---
+
+## Visual Tour & Screenshots
+
+DROPZONE features an intentionally restrained, high-contrast dark aesthetic built with official brand tokens:
+- **Near Black** (`#121417`): Deep surface canvas for fatigue-free viewing.
+- **Warm Off-White** (`#F5F3EF`): High-contrast typography and clear metadata readouts.
+- **Acid Lime** (`#D4FF5C`): High-visibility accents, progress bars, and primary actions.
+
+For the full visual capture checklist, screen dimensions, and reference specifications, see [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
+
+---
+
+## Quick Start (3-Step Walkthrough)
+
+1. **Add Download**:
+   Paste any media or file URL into the top search bar, or navigate to **Batch** to paste multiple links.
+2. **Choose Format & Quality**:
+   Review extracted streams in the **Analyzer**. Choose your desired video resolution, select "Audio Only" extraction, or configure custom container conversion.
+3. **Download & Manage**:
+   Track download speeds (MB/s), downloaded bytes, and ETAs in the **Downloads** queue. Access completed files anytime in **History** or reveal them directly in Windows File Explorer.
+
+---
+
+## System Requirements & Prerequisites
+
+### Supported Operating System
+- **Windows 10 / Windows 11 (64-bit)**.
+
+### Bundled Standalone Python Worker
+DROPZONE bundles a self-contained Python 3.12 companion worker (`dropzone-worker.exe`) that packages `yt-dlp`, `gallery-dl`, `requests`, and `psutil`. **You do not need to install Python on your computer.**
+
+### External FFmpeg Setup
+FFmpeg is required for merging audio/video streams, extracting audio tracks (MP3/FLAC), and remuxing video containers. Because FFmpeg is an external system tool, DROPZONE adheres to standard open-source distribution practices by discovering system-installed FFmpeg rather than distributing a modified binary:
+
+1. **Recommended (WinGet)**:
+   Open PowerShell or Terminal and run:
+   ```powershell
+   winget install Gyan.FFmpeg
+   ```
+2. **Manual Installation**:
+   Download FFmpeg from [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) or [ffmpeg.org](https://ffmpeg.org/), extract it, and either add its `bin` folder to your system `PATH`, or place `ffmpeg.exe` and `ffprobe.exe` into:
+   ```
+   %APPDATA%\DROPZONE\resources\ffmpeg\
+   ```
+   DROPZONE automatically detects FFmpeg on startup and displays its status on the Dashboard and Settings pages.
+
+---
+
+## Windows SmartScreen & Code Signing
+
+DROPZONE release builds are created with official publisher metadata (`Hz Creatives`). 
+
+Because DROPZONE is an independent open-source project without a costly commercial Extended Validation (EV) certificate, Windows Defender SmartScreen or Smart App Control may display an *"Unknown Publisher"* warning on first launch:
+
+1. Click **More info**.
+2. Click **Run anyway**.
+
+For technical details on how Windows evaluates binary reputation, our Authenticode pipeline, and how to verify file integrity, refer to the [Windows Code Signing Guide](docs/WINDOWS_SIGNING_GUIDE.md).
 
 ---
 
 ## Project Structure
 
+DROPZONE is organized as a clean npm workspace monorepo:
+
 ```
 dropzone/
 ├── apps/
-│   └── desktop/            # Electron + React + Vite + Tailwind desktop application
-│       ├── electron/       # Main process, secure preload, and IPC channels
-│       └── src/            # React UI, Zustand state stores, layout, and pages
+│   └── desktop/                  # Electron + React + Vite + Tailwind application
+│       ├── electron/             # Main process, secure preload, IPC channels
+│       │   └── database/         # SQLite persistence layer (sql.js WASM + migrations)
+│       ├── src/                  # React UI, Zustand state stores, views, and pages
+│       └── resources/            # Application icons, artwork, and worker binaries
 ├── packages/
-│   ├── shared/             # Domain types, Zod schemas, IPC contracts
-│   └── database/           # SQLite persistence layer and migrations
+│   └── shared/                   # Shared TypeScript domain contracts, Zod schemas, IPC types
 ├── backend/
-│   ├── worker/             # Python 3 worker with JSON Lines protocol
-│   └── tests/              # Pytest suite for worker & engines
-├── docs/                   # Architectural specs, milestones, test records
-└── README.md
+│   ├── worker/                   # Standalone Python 3.12 worker (yt-dlp, gallery-dl)
+│   └── tests/                    # Pytest suite for worker & engine fault-injection
+├── docs/                         # Architecture documentation, signing guide, checksums
+└── .github/                      # Issue templates, PR template, CI workflows
 ```
 
 ---
 
-## Quick Start (Development)
+## Developer Quick Start
+
+If you want to build or contribute to DROPZONE locally:
 
 ### Prerequisites
-- Node.js >= 20
-- Python >= 3.10
-- FFmpeg (on PATH or packaged)
+- [Node.js](https://nodejs.org/) >= 20.x
+- [Python](https://www.python.org/) >= 3.10 (for backend development)
+- [FFmpeg](https://ffmpeg.org/) (for post-processing)
 
-### Installation
+### Development Setup
 ```bash
-# Install Node dependencies
+# Clone the repository
+git clone https://github.com/hasnizihar/DropZone.git
+cd DropZone
+
+# Install Node dependencies across workspaces
 npm install
 
 # Run the desktop application in development mode
 npm run dev
 ```
 
----
-
-## Testing
-
+### Running Test Suites
 ```bash
-# Run Vitest unit, state machine, and fault-tolerance tests
+# Run Vitest unit & integration tests
 npm test
 
-# Run Python worker & network fault-injection tests
+# Run Python worker test suite
 npm run test:python
 
 # Run Electron runtime smoke test
 npm run smoke:electron
 
-# Run Packaged application smoke test
+# Run Packaged binary smoke test
 npm run smoke:packaged
 ```
 
----
-
-## Windows Release & Distribution
-
-### Release Artifacts
-DROPZONE v1.0.0-alpha.10 provides two Windows distribution packages:
-1. **NSIS Installer (`DROPZONE-Setup-1.0.0-alpha.10-x64.exe`)**:
-   - Standard setup wizard with custom directory selection.
-   - Start Menu and Desktop shortcuts.
-   - Preserves user settings, SQLite database, and downloads during updates and uninstall.
-2. **Portable Executable (`DROPZONE-Portable-1.0.0-alpha.10-x64.exe`)**:
-   - Single-file zero-install executable.
-   - Requires no administrator privileges.
-   - Preserves settings and history in `%APPDATA%\DROPZONE`.
-
-### Bundled Standalone Python Worker
-DROPZONE bundles a standalone, self-contained Python worker (`dropzone-worker.exe`), which includes Python 3.12, `yt-dlp`, `gallery-dl`, `requests`, and `psutil`. Users do not need a globally installed Python runtime.
-
-### Packaging Commands
+### Packaging Builds
 ```bash
-# Compile standalone Python worker
+# Compile standalone Python companion worker
 npm run build:worker
-
-# Generate application icons
-npm run build:icons
 
 # Package Windows NSIS installer
 npm run package:win
 
-# Package Windows Portable executable
+# Package Windows portable executable
 npm run package:portable
 
-# Package both installer and portable packages
+# Package both distributions
 npm run package:all
 ```
-
-### Checksums & Verification
-Release packages can be verified using SHA-256 hashes published in `release/SHA256SUMS.txt`:
-```powershell
-Get-FileHash -Algorithm SHA256 release\DROPZONE-Setup-1.0.0-alpha.10-x64.exe
-Get-FileHash -Algorithm SHA256 release\DROPZONE-Portable-1.0.0-alpha.10-x64.exe
-```
-
----
-
-## Windows Code Signing & Publisher Verification
-
-DROPZONE builds are packaged with official publisher metadata (`Hz Creatives`).
-
-In development and pre-release alpha distributions without a dedicated Authenticode code-signing certificate installed, Windows 11 Smart App Control (SAC) or Microsoft Defender SmartScreen may display an unknown publisher prompt. For technical details on Authenticode integration, hardware token signing, and how Smart App Control evaluates binary reputation, refer to the [Windows Code Signing Guide](file:///d:/INDEX/DropZone/docs/WINDOWS_SIGNING_GUIDE.md).
 
 ---
 
 ## Contributing & Security
 
-- **Contributions**: Contributions, bug reports, and feature requests are welcome! Please read [CONTRIBUTING.md](file:///d:/INDEX/DropZone/CONTRIBUTING.md) for local development workflows and pull request guidelines.
-- **Security Vulnerabilities**: For responsible disclosure of potential security vulnerabilities, please refer to [SECURITY.md](file:///d:/INDEX/DropZone/SECURITY.md).
+- **Contributing**: We welcome bug reports, improvements, and pull requests! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for development rules, commit conventions, and submission processes.
+- **Security Vulnerabilities**: For responsible disclosure of potential security vulnerabilities, please refer to [SECURITY.md](SECURITY.md).
 
 ---
 
-## License & Legal Notices
+## License & Third-Party Acknowledgements
 
-DROPZONE is open-source software licensed under the **[MIT License](file:///d:/INDEX/DropZone/LICENSE)**.
+DROPZONE is open-source software licensed under the **[MIT License](LICENSE)**:
 
 ```
 Copyright (c) 2026 Hz Creatives (KR Hasni Zihar)
 ```
 
-You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, subject to the conditions of the MIT License.
-
 ### Third-Party Software & Companion Engines
-DROPZONE interfaces with and bundles several open-source libraries and command-line engines (including `Electron`, `yt-dlp`, `gallery-dl`, `sql.js`, and `FFmpeg`). Each third-party component retains its original open-source license (such as GPLv3, The Unlicense, Apache 2.0, BSD-3-Clause, and MIT). For complete license texts and architectural attribution, see **[THIRD_PARTY_NOTICES.md](file:///d:/INDEX/DropZone/THIRD_PARTY_NOTICES.md)**.
+DROPZONE interfaces with and bundles several outstanding open-source projects, including Electron, React, `yt-dlp`, `gallery-dl`, `requests`, `psutil`, `sql.js`, and `FFmpeg`. Each component retains its original open-source license. Complete license texts, copyright attributions, and source access instructions are detailed in **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**.
 
 ### Responsible Use Notice
-The MIT License grants rights to the DROPZONE software itself. It does not grant rights to download, convert, or distribute copyrighted, protected, or restricted content without authorization from the respective rights holder, nor does it grant permission to bypass access restrictions or anti-bot protections. Users are solely responsible for ensuring their usage complies with all applicable laws and third-party terms of service.
-
-
-
+The MIT License grants rights to the DROPZONE software itself. It does not grant rights to download, convert, or distribute copyrighted or restricted content without authorization from the respective rights holder. Users are solely responsible for ensuring their usage complies with all applicable laws and third-party terms of service.
