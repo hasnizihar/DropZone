@@ -56,19 +56,31 @@ def create_dropzone_icon(size: int = 256) -> Image.Image:
     return img
 
 def main():
-    assets_dir = os.path.join(os.path.dirname(__file__), "..", "apps", "desktop", "resources")
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    assets_dir = os.path.join(repo_root, "apps", "desktop", "resources")
     os.makedirs(assets_dir, exist_ok=True)
 
-    # Generate master 256x256
-    icon_256 = create_dropzone_icon(256)
+    official_candidates = [
+        os.path.join(repo_root, "resources", "icons", "DropZone Icon.png"),
+        os.path.join(repo_root, "resources", "icons", "4x", "DropZone Icon.png"),
+    ]
+    official_icon = next((c for c in official_candidates if os.path.exists(c)), None)
+
+    if official_icon:
+        print(f"Loading official brand artwork from {official_icon}")
+        src = Image.open(official_icon).convert("RGBA")
+        icon_256 = src.resize((256, 256), Image.Resampling.LANCZOS)
+    else:
+        print("Rendering icon programmatically using brand design tokens...")
+        icon_256 = create_dropzone_icon(256)
+
+    # Generate master 256x256 PNG
     png_path = os.path.join(assets_dir, "icon.png")
     icon_256.save(png_path, "PNG")
     print(f"Saved {png_path}")
 
     # Generate multi-resolution .ico
     ico_sizes = [(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
-    ico_images = [create_dropzone_icon(s[0]) for s in ico_sizes]
-
     ico_path = os.path.join(assets_dir, "icon.ico")
     icon_256.save(ico_path, format="ICO", sizes=ico_sizes)
     print(f"Saved {ico_path} with sizes: {ico_sizes}")

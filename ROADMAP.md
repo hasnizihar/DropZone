@@ -15,6 +15,7 @@
 - [x] Settings Persistence & History Management (Milestone 8)
 - [x] QA & Fault-Tolerance Hardening (Milestone 9)
 - [x] Windows NSIS Installer & Portable Executable (Milestone 10)
+- [x] Open-Source Identity, MIT Licensing & Windows Publisher Configuration (Milestone 11)
 
 ## Future Considerations (Post-1.0)
 

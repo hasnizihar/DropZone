@@ -1,6 +1,6 @@
 appId: com.dropzone.desktop
 productName: DROPZONE
-copyright: "Copyright (c) 2026 DROPZONE Contributors"
+copyright: "Copyright (c) 2026 Hz Creatives (KR Hasni Zihar)"
 
 directories:
   output: ../../release
@@ -31,6 +31,11 @@ win:
       arch:
         - x64
   icon: resources/icon.ico
+  legalTrademarks: "DROPZONE is an open-source project by Hz Creatives."
+  signtoolOptions:
+    publisherName: "Hz Creatives"
+    signingHashAlgorithms:
+      - sha256
 
 nsis:
   oneClick: false
@@ -50,4 +55,3 @@ portable:
 
 compression: normal
 asar: true
-

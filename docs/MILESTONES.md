@@ -195,3 +195,18 @@ This document tracks progress through the 10 core milestones defined in the DROP
   - Third-party licensing audit and comprehensive `THIRD_PARTY_NOTICES.md` covering Electron, Chromium, Node.js, Python, yt-dlp, gallery-dl, requests, psutil, sql.js, and FFmpeg.
   - Verified SHA-256 checksums in `release/SHA256SUMS.txt`.
   - Verified acceptance: 56/56 Pytest tests passing, 83/83 Vitest tests passing across 13 test files, zero TypeScript errors across all workspaces, clean production build, and verified packaged application smoke test.
+
+---
+
+## Milestone 11: Open-Source Identity, MIT Licensing & Windows Publisher Configuration
+- **Status:** Complete (2026-11-13)
+- **Scope:**
+  - Established formal MIT open-source license with `LICENSE` file under copyright of `Hz Creatives (KR Hasni Zihar)`.
+  - Configured consistent publisher and author identity across all package metadata (`package.json`, `apps/desktop/package.json`, `packages/shared/package.json`, and `pyproject.toml`).
+  - Added Windows publisher metadata (`publisherName: "Hz Creatives"`, `legalTrademarks`) in `electron-builder.yml`.
+  - Prepared Authenticode code-signing configuration supporting environment variables (`CSC_LINK`, `CSC_NAME`, `CSC_KEY_PASSWORD`) without committing secrets or breaking unsigned builds.
+  - Documented Windows trust layers, Smart App Control (SAC) architecture, and code-signing instructions in `docs/WINDOWS_SIGNING_GUIDE.md`.
+  - Created open-source repository governance templates: `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/bug_report.md`, `.github/ISSUE_TEMPLATE/feature_request.md`, and `.github/PULL_REQUEST_TEMPLATE.md`.
+  - Updated `README.md` with explicit MIT license terms, third-party companion license notices, and ethical use boundaries.
+  - Updated `AboutPage.tsx` to surface publisher attribution and MIT license details.
+  - Re-verified all test suites (Pytest, Vitest, TypeScript, production builds, and smoke tests).

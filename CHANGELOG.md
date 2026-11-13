@@ -2,6 +2,23 @@
 
 All notable changes to the DROPZONE project will be documented in this file.
 
+## [1.0.0-alpha.11] - 2026-11-13
+
+### Added
+- **MIT Open-Source License & Copyright Identity**:
+  - Added official root `LICENSE` file under the MIT License, establishing copyright with `Hz Creatives (KR Hasni Zihar)`.
+  - Configured consistent author, description, and repository fields across `package.json`, `apps/desktop/package.json`, `packages/shared/package.json`, and `pyproject.toml`.
+- **Windows Publisher & Code-Signing Configuration**:
+  - Configured Windows publisher metadata (`publisherName: "Hz Creatives"`, `legalTrademarks`) in `electron-builder.yml`.
+  - Prepared Authenticode code-signing configuration via standard CI/CD environment variables (`CSC_LINK`, `CSC_NAME`, `CSC_KEY_PASSWORD`).
+  - Added comprehensive `docs/WINDOWS_SIGNING_GUIDE.md` explaining Windows trust layers, Smart App Control behavior, and signing workflows.
+- **Open-Source Repository Governance**:
+  - Added `CONTRIBUTING.md` detailing development setup, code of conduct, testing requirements, and PR workflows.
+  - Added GitHub issue templates (`.github/ISSUE_TEMPLATE/bug_report.md`, `feature_request.md`) and pull request template (`.github/PULL_REQUEST_TEMPLATE.md`).
+- **UI & Documentation Updates**:
+  - Updated `README.md` with explicit MIT licensing terms, third-party companion license notices, and ethical use boundaries.
+  - Updated `AboutPage.tsx` with publisher attribution and open-source license information.
+
 ## [1.0.0-alpha.10] - 2026-11-13
 
 ### Added

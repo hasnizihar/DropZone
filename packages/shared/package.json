@@ -1,6 +1,13 @@
 {
   "name": "@dropzone/shared",
   "version": "1.0.0-alpha.10",
+  "description": "Shared domain models, Zod validation schemas, and IPC protocol contracts for DROPZONE",
+  "author": "Hz Creatives (KR Hasni Zihar)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hasnizihar/dropzone.git"
+  },
   "private": true,
   "main": "./src/index.ts",
   "types": "./src/index.ts",

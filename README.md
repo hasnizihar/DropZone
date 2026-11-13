@@ -127,4 +127,38 @@ Get-FileHash -Algorithm SHA256 release\DROPZONE-Setup-1.0.0-alpha.10-x64.exe
 Get-FileHash -Algorithm SHA256 release\DROPZONE-Portable-1.0.0-alpha.10-x64.exe
 ```
 
+---
+
+## Windows Code Signing & Publisher Verification
+
+DROPZONE builds are packaged with official publisher metadata (`Hz Creatives`).
+
+In development and pre-release alpha distributions without a dedicated Authenticode code-signing certificate installed, Windows 11 Smart App Control (SAC) or Microsoft Defender SmartScreen may display an unknown publisher prompt. For technical details on Authenticode integration, hardware token signing, and how Smart App Control evaluates binary reputation, refer to the [Windows Code Signing Guide](file:///d:/INDEX/DropZone/docs/WINDOWS_SIGNING_GUIDE.md).
+
+---
+
+## Contributing & Security
+
+- **Contributions**: Contributions, bug reports, and feature requests are welcome! Please read [CONTRIBUTING.md](file:///d:/INDEX/DropZone/CONTRIBUTING.md) for local development workflows and pull request guidelines.
+- **Security Vulnerabilities**: For responsible disclosure of potential security vulnerabilities, please refer to [SECURITY.md](file:///d:/INDEX/DropZone/SECURITY.md).
+
+---
+
+## License & Legal Notices
+
+DROPZONE is open-source software licensed under the **[MIT License](file:///d:/INDEX/DropZone/LICENSE)**.
+
+```
+Copyright (c) 2026 Hz Creatives (KR Hasni Zihar)
+```
+
+You are free to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the software, subject to the conditions of the MIT License.
+
+### Third-Party Software & Companion Engines
+DROPZONE interfaces with and bundles several open-source libraries and command-line engines (including `Electron`, `yt-dlp`, `gallery-dl`, `sql.js`, and `FFmpeg`). Each third-party component retains its original open-source license (such as GPLv3, The Unlicense, Apache 2.0, BSD-3-Clause, and MIT). For complete license texts and architectural attribution, see **[THIRD_PARTY_NOTICES.md](file:///d:/INDEX/DropZone/THIRD_PARTY_NOTICES.md)**.
+
+### Responsible Use Notice
+The MIT License grants rights to the DROPZONE software itself. It does not grant rights to download, convert, or distribute copyrighted, protected, or restricted content without authorization from the respective rights holder, nor does it grant permission to bypass access restrictions or anti-bot protections. Users are solely responsible for ensuring their usage complies with all applicable laws and third-party terms of service.
+
+
 

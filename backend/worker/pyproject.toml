@@ -7,6 +7,10 @@ name = "dropzone-worker"
 version = "1.0.0"
 description = "DROPZONE Universal Desktop Downloader Background Worker Engine"
 readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Hz Creatives (KR Hasni Zihar)", email = "hasnizihar751@gmail.com" }
+]
 requires-python = ">=3.10"
 dependencies = [
     "pydantic>=2.0.0",

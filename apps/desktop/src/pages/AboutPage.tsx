@@ -69,7 +69,7 @@ export const AboutPage: React.FC = () => {
         </p>
 
         <div className="pt-2 text-[11px] text-brand-grey border-t border-brand-border flex justify-between items-center">
-          <span>Licensed under the Open Source MIT License</span>
+          <span>Created by Hz Creatives (KR Hasni Zihar) • Open Source MIT License</span>
           <span className="font-mono text-brand-lime">#D4FF5C Edition</span>
         </div>
       </div>
