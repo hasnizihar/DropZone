@@ -143,7 +143,11 @@ export class WorkerProcess {
       // ignore outside Electron
     }
 
-    if (standaloneBinary) {
+    // In packaged application, prefer standalone bundled binary.
+    // In development mode, prefer Python source unless DROPZONE_FORCE_STANDALONE is explicitly set.
+    const preferStandalone = isPackaged || process.env.DROPZONE_FORCE_STANDALONE === 'true';
+
+    if (standaloneBinary && preferStandalone) {
       this.proc = spawn(standaloneBinary, [], {
         cwd: path.dirname(standaloneBinary),
         shell: false,

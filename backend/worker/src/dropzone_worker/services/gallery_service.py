@@ -157,13 +157,13 @@ class GalleryService:
             logger.warning(f"Error while extracting gallery items: {exc}")
             if not assets:
                 raise WorkerProtocolError(
-                    ProtocolErrorCode.EXTRACTOR_ERROR,
+                    ProtocolErrorCode.EXTRACTION_FAILED,
                     f"Gallery extraction failed: {exc}"
                 )
 
         if not assets:
             raise WorkerProtocolError(
-                ProtocolErrorCode.EXTRACTOR_ERROR,
+                ProtocolErrorCode.EXTRACTION_FAILED,
                 f"No downloadable image assets found in gallery '{url}'."
             )
 

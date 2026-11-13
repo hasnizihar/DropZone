@@ -42,6 +42,7 @@ interface AppState {
   analysisStatus: AnalysisStatus;
   selectedFormatId: string | null;
   isAnalyzing: boolean;
+  analyzingUrl: string | null;
   analyzeError: string | null;
   analysisDurationMs: number | null;
   systemInfo: { version: string; platform: string; engines: SystemEnginesReport } | null;
@@ -136,6 +137,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   analysisStatus: 'idle',
   selectedFormatId: null,
   isAnalyzing: false,
+  analyzingUrl: null,
   analyzeError: null,
   analysisDurationMs: null,
   systemInfo: null,
@@ -177,6 +179,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       analyzedPlaylist: null,
       selectedFormatId: null,
       isAnalyzing: false,
+      analyzingUrl: null,
       analysisStatus: 'idle',
       analyzeError: null,
       analysisDurationMs: null,
@@ -387,6 +390,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     set({
       isAnalyzing: true,
+      analyzingUrl: trimmed,
       analysisStatus: 'validating',
       analyzeError: null,
     });

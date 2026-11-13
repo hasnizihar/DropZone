@@ -25,6 +25,8 @@ import {
   Square,
   ShieldCheck,
   HelpCircle,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 import type { MediaFormat, PostProcessOptions } from '@dropzone/shared';
@@ -59,6 +61,7 @@ export const AnalyzerPage: React.FC = () => {
   const selectedFormatId = useAppStore((state) => state.selectedFormatId);
   const setSelectedFormatId = useAppStore((state) => state.setSelectedFormatId);
   const isAnalyzing = useAppStore((state) => state.isAnalyzing);
+  const analyzingUrl = useAppStore((state) => state.analyzingUrl);
   const analyzeError = useAppStore((state) => state.analyzeError);
   const analysisDurationMs = useAppStore((state) => state.analysisDurationMs);
   const inspectUrl = useAppStore((state) => state.inspectUrl);
@@ -88,13 +91,15 @@ export const AnalyzerPage: React.FC = () => {
   const [embedMetadata, setEmbedMetadata] = useState<boolean>(true);
   const [preserveSource, setPreserveSource] = useState<boolean>(settings.preserveDownloadedSource || false);
 
-  // Sync state when new media is analyzed
+  // Sync state when new media is analyzed or when analysis begins from Dashboard
   useEffect(() => {
     if (analyzedMedia) {
       setInputUrl(analyzedMedia.url);
       setCustomFilename(analyzedMedia.title);
+    } else if (analyzingUrl) {
+      setInputUrl(analyzingUrl);
     }
-  }, [analyzedMedia]);
+  }, [analyzedMedia, analyzingUrl]);
 
   const handleInspect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -297,12 +302,23 @@ export const AnalyzerPage: React.FC = () => {
 
         {/* Status Alert */}
         {analyzeError && (
-          <div className="mt-4 p-3.5 bg-red-950/40 border border-red-500/40 rounded-lg flex items-start space-x-3 text-red-300 text-xs animate-in fade-in">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
-            <div className="space-y-1">
-              <div className="font-semibold text-red-200">Inspection Error</div>
-              <p className="leading-relaxed opacity-90">{analyzeError}</p>
+          <div className="mt-4 p-3.5 bg-red-950/40 border border-red-500/40 rounded-lg flex items-start justify-between gap-3 text-red-300 text-xs animate-in fade-in">
+            <div className="flex items-start space-x-3">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
+              <div className="space-y-1">
+                <div className="font-semibold text-red-200">Inspection Error</div>
+                <p className="leading-relaxed opacity-90">{analyzeError}</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={handleInspect}
+              disabled={isAnalyzing || !inputUrl.trim()}
+              className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-200 border border-red-500/40 rounded font-semibold text-xs flex items-center space-x-1.5 flex-shrink-0 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className="w-3 h-3" />
+              <span>Retry</span>
+            </button>
           </div>
         )}
       </div>
@@ -863,6 +879,62 @@ export const AnalyzerPage: React.FC = () => {
               <Plus className="w-4 h-4" />
               <span>Add to Queue</span>
             </button>
+          </div>
+        </div>
+      ) : isAnalyzing ? (
+        <div className="bg-brand-surface border border-brand-lime/30 rounded-xl p-8 sm:p-12 text-center animate-in fade-in duration-300 relative overflow-hidden shadow-lg">
+          {/* Glowing Animated Top Border */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-brand-lime to-transparent animate-pulse" />
+
+          {/* Radar / Scanner Pulse Icon */}
+          <div className="relative inline-flex items-center justify-center w-16 h-16 rounded-full bg-brand-lime/10 border border-brand-lime/30 mb-5">
+            <span className="absolute inset-0 rounded-full bg-brand-lime/20 animate-ping opacity-75" />
+            <Loader2 className="w-8 h-8 text-brand-lime animate-spin relative z-10" />
+          </div>
+
+          <h3 className="text-lg font-bold text-brand-white mb-2">
+            Inspecting URL & Media Streams
+          </h3>
+          <p className="text-xs text-brand-grey max-w-md mx-auto mb-5 leading-relaxed">
+            Probing remote server for available video resolutions (4K, 1080p, 720p), audio codecs, bitrates, and downloadable streams.
+          </p>
+
+          {/* Current URL Pill */}
+          <div className="inline-flex items-center max-w-lg px-3.5 py-1.5 rounded-lg bg-brand-black border border-brand-border text-xs font-mono text-brand-lime mb-6 truncate shadow-inner">
+            <Search className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-brand-grey" />
+            <span className="truncate">{inputUrl || analyzingUrl || 'Connecting to source...'}</span>
+          </div>
+
+          {/* Animated Gliding Progress Bar */}
+          <div className="w-full max-w-md mx-auto bg-brand-black h-2 rounded-full overflow-hidden border border-brand-border mb-8 relative">
+            <div className="h-full bg-brand-lime rounded-full animate-indeterminate" />
+          </div>
+
+          {/* Progress Steps Checklist */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-xl mx-auto text-left text-xs">
+            <div className="bg-brand-black/60 border border-brand-border/60 rounded-lg p-3 flex items-center space-x-2.5">
+              <CheckCircle2 className="w-4 h-4 text-brand-lime flex-shrink-0" />
+              <div>
+                <div className="font-semibold text-brand-white">URL Security</div>
+                <div className="text-[10px] text-brand-grey">SSRF & scheme passed</div>
+              </div>
+            </div>
+
+            <div className="bg-brand-black/60 border border-brand-lime/40 rounded-lg p-3 flex items-center space-x-2.5 shadow-sm">
+              <Loader2 className="w-4 h-4 text-brand-lime animate-spin flex-shrink-0" />
+              <div>
+                <div className="font-semibold text-brand-lime">Probing Streams</div>
+                <div className="text-[10px] text-brand-grey">yt-dlp engine active</div>
+              </div>
+            </div>
+
+            <div className="bg-brand-black/40 border border-brand-border/40 rounded-lg p-3 flex items-center space-x-2.5 opacity-60">
+              <div className="w-4 h-4 rounded-full border border-brand-grey/50 flex-shrink-0" />
+              <div>
+                <div className="font-semibold text-brand-white">Normalizing</div>
+                <div className="text-[10px] text-brand-grey">Sorting resolutions</div>
+              </div>
+            </div>
           </div>
         </div>
       ) : (

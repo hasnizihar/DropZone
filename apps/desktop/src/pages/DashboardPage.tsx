@@ -12,6 +12,7 @@ import {
   Layers,
   ArrowRight,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/useAppStore';
 
@@ -39,12 +40,12 @@ export const DashboardPage: React.FC = () => {
 
   const handleAnalyze = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputUrl.trim()) return;
+    const url = inputUrl.trim();
+    if (!url) return;
 
-    const success = await inspectUrl(inputUrl.trim());
-    if (success) {
-      setActiveTab('analyzer');
-    }
+    // Immediately navigate to the URL Analyzer page so the user sees live inspection progress
+    setActiveTab('analyzer');
+    await inspectUrl(url);
   };
 
   const categories = [
@@ -82,12 +83,38 @@ export const DashboardPage: React.FC = () => {
           <button
             type="submit"
             disabled={isAnalyzing || !inputUrl.trim()}
-            className="px-6 py-3 bg-brand-lime text-brand-black rounded-lg font-semibold text-sm hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center space-x-2"
+            className="px-6 py-3 bg-brand-lime text-brand-black rounded-lg font-semibold text-sm hover:brightness-105 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center space-x-2 flex-shrink-0"
           >
-            <span>{isAnalyzing ? 'Analyzing...' : 'Analyze URL'}</span>
-            <ArrowRight className="w-4 h-4" />
+            {isAnalyzing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Analyzing...</span>
+              </>
+            ) : (
+              <>
+                <span>Analyze URL</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
+
+        {/* Active Inspection Banner */}
+        {isAnalyzing && (
+          <div className="mt-4 p-3 bg-brand-lime/10 border border-brand-lime/30 rounded-lg flex items-center justify-between text-xs animate-in fade-in">
+            <div className="flex items-center space-x-2.5">
+              <Loader2 className="w-4 h-4 text-brand-lime animate-spin flex-shrink-0" />
+              <span className="text-brand-white">Active URL inspection in progress...</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('analyzer')}
+              className="px-3 py-1 bg-brand-lime text-brand-black rounded font-bold hover:brightness-105 transition-all text-xs"
+            >
+              View in Analyzer &rarr;
+            </button>
+          </div>
+        )}
 
         {/* Supported content badges */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-6">

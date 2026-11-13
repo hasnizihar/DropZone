@@ -51,3 +51,4 @@ if ($expected -eq $actual) {
 ```bash
 sha256sum DROPZONE-Setup-1.0.0-alpha.11-x64.exe
 ```
+

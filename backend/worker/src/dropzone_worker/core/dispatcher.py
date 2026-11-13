@@ -105,10 +105,10 @@ class CommandDispatcher:
         return create_response(request.id, request.command, payload)
 
     def _analyze_unified(self, url: str) -> Dict[str, Any]:
-        """Unified inspection trying direct image, gallery, playlist, yt-dlp media, or direct file."""
+        """Unified inspection prioritizing direct image, playlist, yt-dlp media streaming, gallery, or direct file."""
         validate_url(url)
 
-        # 1. Direct image check
+        # 1. Direct image check (fast path: .jpg, .png, .webp, .svg)
         if self.gallery_service.is_image_url(url):
             try:
                 res = self.gallery_service.extract_gallery_or_image(url)
@@ -117,16 +117,7 @@ class CommandDispatcher:
             except Exception:
                 pass
 
-        # 2. Supported gallery site check
-        if self.gallery_service.is_gallery_supported(url):
-            try:
-                res = self.gallery_service.extract_gallery_or_image(url)
-                res["downloadType"] = "gallery"
-                return res
-            except Exception:
-                pass
-
-        # 3. Playlist check
+        # 2. Playlist check (fast path: playlist queries/paths)
         if self.playlist_service.is_playlist_url(url):
             try:
                 res = self.playlist_service.extract_playlist(url)
@@ -135,7 +126,7 @@ class CommandDispatcher:
             except Exception:
                 pass
 
-        # 4. Media analysis with yt-dlp
+        # 3. Media analysis with yt-dlp (primary video/audio streaming engine)
         media_error = None
         try:
             res = self.analyzer.analyze(url)
@@ -144,7 +135,16 @@ class CommandDispatcher:
         except Exception as exc:
             media_error = exc
 
-        # 4. Direct HTTP fallback (e.g., zip, pdf, exe, iso, direct stream)
+        # 4. Supported gallery site check via gallery-dl (fallback for non-video galleries/albums)
+        if self.gallery_service.is_gallery_supported(url):
+            try:
+                res = self.gallery_service.extract_gallery_or_image(url)
+                res["downloadType"] = "gallery"
+                return res
+            except Exception:
+                pass
+
+        # 5. Direct HTTP fallback (e.g., zip, pdf, exe, iso, direct stream)
         try:
             direct_res = self.http_service.inspect_url(url)
             if direct_res.get("category") == "image":
