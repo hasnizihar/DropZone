@@ -48,3 +48,4 @@ export const FAQS: FAQItem[] = [
       'DROPZONE is released under the permissive MIT License. You are free to inspect, modify, fork, and contribute to the source code on GitHub. Third-party components like gallery-dl and FFmpeg are governed by strict subprocess isolation boundaries in full compliance with GPL licenses.',
   },
 ];
+

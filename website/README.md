@@ -63,3 +63,4 @@ When connecting the GitHub repository (`hasnizihar/DropZone`) to Vercel:
 | **Install Command** | `npm install` |
 
 Changes pushed to the `website/` directory deploy independently without requiring a new desktop release.
+

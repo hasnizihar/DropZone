@@ -42,3 +42,4 @@ export const CURRENT_RELEASE = {
     },
   ] as ReleaseAsset[],
 };
+

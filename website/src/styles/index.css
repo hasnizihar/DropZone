@@ -27,3 +27,4 @@
 .gradient-radial {
   background-radial: radial-gradient(ellipse at center, var(--tw-gradient-stops));
 }
+
