@@ -53,7 +53,7 @@ This release delivers fundamental reliability hardening, resolving edge-case bug
 
 | Package | Filename | Description | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
-| **Windows Installer** | `DROPZONE-Setup-1.0.0-alpha.12-x64.exe` | Standard setup wizard with Desktop & Start Menu shortcuts, safe uninstaller, and user data retention. | `28507c3ed6c40c696bdc33ad6ae7d0646ae0ec6ba2847b6c8ea00ee6fc5ce294` |
+| **Windows Installer** | `DROPZONE-Setup-1.0.0-alpha.12-x64.exe` | Inno Setup 6 wizard with directory selection, Desktop & Start Menu shortcuts, safe uninstaller, and user data retention. | `6f5df74630cf3f03c5ff973efd83530e8324dddf99bf60dacf5adae4703ed95f` |
 | **Portable Binary** | `DROPZONE-Portable-1.0.0-alpha.12-x64.exe` | Zero-install standalone executable for USB drives or restricted permissions. | `39c2edcbddb4ea897e2f5dd00fbea9840f9a08ea7056ec91780082afb26993e2` |
 
 ---

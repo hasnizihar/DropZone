@@ -56,6 +56,23 @@ DROPZONE features an intentionally restrained, high-contrast dark aesthetic buil
 - **Warm Off-White** (`#F5F3EF`): High-contrast typography and clear metadata readouts.
 - **Acid Lime** (`#D4FF5C`): High-visibility accents, progress bars, and primary actions.
 
+<p align="center">
+  <img src="docs/images/screenshot-dashboard.png" alt="DROPZONE Dashboard View" width="900" />
+  <br />
+  <em>DROPZONE Dashboard — Real-time engine health, instant URL input bar, and activity overview.</em>
+</p>
+
+### Interface Gallery
+
+| View | Screenshot | Description |
+| :--- | :--- | :--- |
+| **URL Analyzer** | [screenshot-analyzer.png](docs/images/screenshot-analyzer.png) | Inspect media streams, audio codecs, bitrates, and video resolutions before starting. |
+| **Download Queue** | [screenshot-queue.png](docs/images/screenshot-queue.png) | Active progress indicators in Acid Lime, speed readouts (MB/s), ETA, and pause/resume. |
+| **Batch Downloader** | [screenshot-batch.png](docs/images/screenshot-batch.png) | Ingest multi-URL playlists, text files, and bulk queues with categorized detection. |
+| **Download History** | [screenshot-history.png](docs/images/screenshot-history.png) | Searchable SQLite database of completed downloads with quick "Open Folder" action. |
+| **Settings** | [screenshot-settings.png](docs/images/screenshot-settings.png) | Concurrency limit, default audio extraction formats (MP3/FLAC), and FFmpeg path config. |
+| **About View** | [screenshot-about.png](docs/images/screenshot-about.png) | Version information, license terms, and bundled engine status. |
+
 For the full visual capture checklist, screen dimensions, and reference specifications, see [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
 ---

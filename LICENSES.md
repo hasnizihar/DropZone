@@ -1,15 +1,24 @@
-# Licenses & Third-Party Notices
+# Licenses & Legal Notices
 
-DROPZONE is open-source software licensed under the MIT License.
+DROPZONE is free and open-source software developed by **Hz Creatives (KR Hasni Zihar)**.
 
-## Third-Party Components & Acknowledgments
+---
 
-- **Electron**: MIT License (Copyright OpenJS Foundation)
-- **React**: MIT License (Copyright Meta Platforms, Inc.)
-- **Tailwind CSS**: MIT License (Copyright Tailwind Labs, Inc.)
-- **Lucide Icons**: ISC License (Copyright Lucide Contributors)
-- **yt-dlp**: Unlicense (Public Domain)
-- **FFmpeg**: LGPL 2.1+ / GPL 2.0+ (Copyright FFmpeg developers)
-- **Pydantic**: MIT License (Copyright Samuel Colvin)
-- **Zod**: MIT License (Copyright Colin McDonnell)
+## 1. Project License
 
+The DROPZONE source code, application wrappers, and build automation are licensed under the **MIT License**.
+See the complete license text in [LICENSE](LICENSE).
+
+```text
+Copyright (c) 2026 Hz Creatives (KR Hasni Zihar)
+```
+
+---
+
+## 2. Third-Party Notices & Component Licenses
+
+DROPZONE incorporates, bundles, or interfaces with several open-source third-party software libraries and companion tools (including Electron, Chromium, Python, yt-dlp, gallery-dl, sql.js, React, and FFmpeg).
+
+For the complete third-party component inventory, version numbers, upstream project repositories, architectural isolation details (GPL compliance), and full third-party license texts, please refer to:
+
+👉 **[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)**

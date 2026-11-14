@@ -23,6 +23,8 @@
     "postinstall": "node scripts/patch-electron-builder.cjs",
     "build:worker": "python scripts/build-worker.py",
     "build:icons": "python scripts/generate-icons.py",
+    "package:inno": "powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1",
+    "verify:installer": "powershell -ExecutionPolicy Bypass -File scripts/verify-installer.ps1",
     "package:win": "node scripts/patch-electron-builder.cjs && npm run build && electron-builder --win nsis --project apps/desktop --config electron-builder.yml",
     "package:portable": "node scripts/patch-electron-builder.cjs && npm run build && electron-builder --win portable --project apps/desktop --config electron-builder.yml",
     "package:all": "node scripts/patch-electron-builder.cjs && npm run build && electron-builder --win --project apps/desktop --config electron-builder.yml",

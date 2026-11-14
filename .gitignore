@@ -45,6 +45,9 @@ ENV/
 *.sqlite3
 *.db
 downloads_test/
+downloads_test*/
+tmp_*
+test_downloads*/
 
 # Logs
 *.log

@@ -589,6 +589,9 @@ function setupIpcHandlers() {
 
 // App lifecycle
 app.whenReady().then(async () => {
+  // Bind authoritative Windows AppUserModelID for taskbar grouping and toast identity
+  app.setAppUserModelId('com.dropzone.desktop');
+
   // Initialize SQLite database under electron userData directory (Milestone 8)
   try {
     const dbPath = path.join(app.getPath('userData'), 'dropzone.db');

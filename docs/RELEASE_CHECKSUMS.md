@@ -8,9 +8,10 @@ This document provides cryptographic SHA-256 hashes for all official DROPZONE re
 
 | Package Filename | Target Architecture | SHA-256 Checksum |
 | :--- | :--- | :--- |
-| `DROPZONE-Setup-1.0.0-alpha.12-x64.exe` | Windows 10/11 x64 (NSIS Installer) | `28507c3ed6c40c696bdc33ad6ae7d0646ae0ec6ba2847b6c8ea00ee6fc5ce294` |
+| `DROPZONE-Setup-1.0.0-alpha.12-x64.exe` | Windows 10/11 x64 (Inno Setup Installer) | `6f5df74630cf3f03c5ff973efd83530e8324dddf99bf60dacf5adae4703ed95f` |
 | `DROPZONE-Portable-1.0.0-alpha.12-x64.exe` | Windows 10/11 x64 (Portable Binary) | `39c2edcbddb4ea897e2f5dd00fbea9840f9a08ea7056ec91780082afb26993e2` |
-| `dropzone-worker.exe` | Bundled Standalone Python Worker | `903d629bd8136d0843f5763d3e9a1acb4e0e47d213fe056ba6830e317722c827` |
+| `DROPZONE-Setup-1.0.0-alpha.12-x64-nsis.exe` | Windows 10/11 x64 (Preserved NSIS Installer) | `28507c3ed6c40c696bdc33ad6ae7d0646ae0ec6ba2847b6c8ea00ee6fc5ce294` |
+| `dropzone-worker.exe` | Bundled Standalone Python Worker | `4c077faac63d3f95c5336e49cad36d1bb276ec15dc21b258f426cb999ffdf16a` |
 
 ---
 
@@ -40,15 +41,15 @@ This document provides cryptographic SHA-256 hashes for all official DROPZONE re
 Run the built-in `Get-FileHash` cmdlet against your downloaded file:
 
 ```powershell
-Get-FileHash -Algorithm SHA256 "DROPZONE-Setup-1.0.0-alpha.11-x64.exe"
+Get-FileHash -Algorithm SHA256 "DROPZONE-Setup-1.0.0-alpha.12-x64.exe"
 ```
 
 Verify that the returned hash matches the table above.
 
 ### Automated Hash Check (PowerShell)
 ```powershell
-$expected = "9029419fb68adaa1126ca69209f682a5c0c688384d58aefd6d906da4bb1498fe"
-$actual = (Get-FileHash -Algorithm SHA256 "DROPZONE-Setup-1.0.0-alpha.11-x64.exe").Hash.ToLower()
+$expected = "6f5df74630cf3f03c5ff973efd83530e8324dddf99bf60dacf5adae4703ed95f"
+$actual = (Get-FileHash -Algorithm SHA256 "DROPZONE-Setup-1.0.0-alpha.12-x64.exe").Hash.ToLower()
 
 if ($expected -eq $actual) {
     Write-Host "Verification PASSED: Binary integrity confirmed." -ForegroundColor Green

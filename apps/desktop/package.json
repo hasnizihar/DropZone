@@ -1,5 +1,6 @@
 {
   "name": "@dropzone/desktop",
+  "productName": "DROPZONE",
   "version": "1.0.0-alpha.12",
   "description": "Universal Desktop Download Manager",
   "author": "Hz Creatives (KR Hasni Zihar)",
@@ -18,6 +19,7 @@
     "build:electron": "node scripts/build-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "package:inno": "powershell -ExecutionPolicy Bypass -File ../../scripts/build-installer.ps1",
     "package:win": "electron-builder --win nsis --config electron-builder.yml",
     "package:portable": "electron-builder --win portable --config electron-builder.yml",
     "package:all": "electron-builder --win --config electron-builder.yml"

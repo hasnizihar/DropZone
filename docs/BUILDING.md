@@ -105,16 +105,26 @@ npm run typecheck --workspace=@dropzone/desktop
 
 ## 6. Packaging Release Artifacts
 
-DROPZONE uses `electron-builder` with an NSIS uninstaller patch (`scripts/patch-electron-builder.cjs`) that ensures smooth building under Windows Smart App Control and AppLocker.
+DROPZONE provides an Inno Setup Windows installer as its primary setup wizard, alongside a zero-install portable executable.
 
-### Build All Production Packages (NSIS + Portable)
-```bash
-npm run package:all
+### Prerequisites for Inno Setup Installer:
+Install Inno Setup 6 (free & open source):
+```powershell
+winget install JRSoftware.InnoSetup
 ```
 
-### Package NSIS Setup Installer Only
-```bash
-npm run package:win
+### Build Inno Setup Installer
+```powershell
+# Automatically builds electron, unpacks runtime, and compiles Inno Setup installer
+npm run package:inno
+
+# Or execute script directly with options:
+powershell -ExecutionPolicy Bypass -File scripts/build-installer.ps1
+```
+
+### Verify Installer Integrity & Sandbox Installation
+```powershell
+npm run verify:installer
 ```
 
 ### Package Portable Standalone Executable Only

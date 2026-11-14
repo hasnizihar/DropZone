@@ -23,6 +23,12 @@ All notable changes to the DROPZONE project will be documented in this file.
   - Fixed duplicate job display in Downloads queue by synchronizing Zustand store deduplication with authoritative Electron queue state.
 
 ### Added
+- **Inno Setup Windows Packaging & Desktop Identity**:
+  - Replaced NSIS with a modern Inno Setup 6 installer (`installer/dropzone.iss`) delivering 11.4 MB smaller package size via solid LZMA2/ultra compression.
+  - Configured clean per-user installation targeting `{localappdata}\Programs\DROPZONE` requiring no administrator privileges.
+  - Implemented automated PowerShell build and verification scripts (`scripts/build-installer.ps1`, `scripts/verify-installer.ps1`).
+  - Embedded Windows PE version resources into standalone companion worker (`dropzone-worker.exe`) via `scripts/worker_version_info.txt`.
+  - Bound authoritative Windows `AppUserModelId` (`com.dropzone.desktop`) in Electron main process for taskbar grouping and toast notification identity.
 - **Platform Compatibility Matrix & Real Download Test Runners**:
   - Created automated platform compatibility test runner (`scripts/test-platform-matrix.py`) and real file download verifier (`scripts/test-real-downloads.py`).
   - Established 5-tier platform compatibility taxonomy distinguishing metadata extraction from actual byte transfer.

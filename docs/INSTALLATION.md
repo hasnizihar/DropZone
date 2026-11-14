@@ -10,7 +10,7 @@ DROPZONE is distributed in two official packaging formats:
 
 | Package | Filename | Recommended For |
 | :--- | :--- | :--- |
-| **Setup Installer (NSIS)** | `DROPZONE-Setup-1.0.0-alpha.12-x64.exe` | General users. Provides standard desktop shortcut, Start Menu entry, automatic updates, and clean Windows uninstallation via Settings / Control Panel. |
+| **Setup Installer (Inno Setup)** | `DROPZONE-Setup-1.0.0-alpha.12-x64.exe` | General users. Clean modern installation wizard with directory selection, desktop & Start Menu shortcuts, and seamless uninstallation via Windows Settings. Per-user install ({localappdata}\Programs\DROPZONE) requiring no administrator privileges. |
 | **Portable Executable** | `DROPZONE-Portable-1.0.0-alpha.12-x64.exe` | Power users, USB flash drives, and environments where administrative installation is restricted. Requires zero installation and leaves no system registry entries. |
 
 Download the latest binaries from the [GitHub Releases](https://github.com/hasnizihar/DropZone/releases) page.

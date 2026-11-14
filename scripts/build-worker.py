@@ -16,6 +16,8 @@ def build_worker():
     print(f"[BuildWorker] Packaging standalone worker from: {entry_point}")
     print(f"[BuildWorker] Output directory: {dist_dir}")
 
+    version_file = os.path.join(project_root, "scripts", "worker_version_info.txt")
+
     pyinstaller_args = [
         "--name=dropzone-worker",
         "--onefile",
@@ -29,8 +31,12 @@ def build_worker():
         f"--specpath={build_dir}",
         "--clean",
         "--noconfirm",
-        entry_point,
     ]
+
+    if sys.platform == "win32" and os.path.isfile(version_file):
+        pyinstaller_args.append(f"--version-file={version_file}")
+
+    pyinstaller_args.append(entry_point)
 
     PyInstaller.__main__.run(pyinstaller_args)
 
