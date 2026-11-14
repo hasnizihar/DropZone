@@ -1,0 +1,4 @@
+# DROPZONE Companion Python Worker Development & Testing Dependencies
+-r requirements.txt
+pytest>=8.0.0
+pyinstaller>=6.0.0

@@ -32,8 +32,8 @@ Install the Python worker development dependencies:
 
 ```bash
 cd backend/worker
+pip install -r requirements-dev.txt
 pip install -e .
-pip install pytest pyinstaller requests psutil pydantic yt-dlp gallery-dl
 cd ../..
 ```
 
