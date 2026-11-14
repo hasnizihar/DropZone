@@ -40,6 +40,7 @@ def test_ffmpeg_discovery_and_status():
 
 def test_reject_unsupported_audio_format(tmp_path):
     service = FFmpegService()
+    service._ffmpeg_path = service._ffmpeg_path or "mock_ffmpeg"
     fake_input = tmp_path / "test.mp4"
     fake_input.write_bytes(b"dummy")
 
@@ -55,6 +56,7 @@ def test_reject_unsupported_audio_format(tmp_path):
 
 def test_reject_unsupported_container(tmp_path):
     service = FFmpegService()
+    service._ffmpeg_path = service._ffmpeg_path or "mock_ffmpeg"
     fake_input = tmp_path / "test.mp4"
     fake_input.write_bytes(b"dummy")
 
@@ -67,6 +69,19 @@ def test_reject_unsupported_container(tmp_path):
             remux_container="avi_unsupported",
         )
     assert exc_info.value.code == ProtocolErrorCode.VALIDATION_ERROR
+
+def test_ffmpeg_service_engine_unavailable_when_missing(tmp_path):
+    service = FFmpegService()
+    service._ffmpeg_path = None
+    with pytest.raises(WorkerProtocolError) as exc_info:
+        service.execute_postprocess(
+            job_id="test_missing_ffmpeg",
+            input_path=str(tmp_path / "any.mp4"),
+            action="extract_audio",
+            target_directory=str(tmp_path),
+            audio_format="mp3",
+        )
+    assert exc_info.value.code == ProtocolErrorCode.ENGINE_UNAVAILABLE
 
 def test_real_audio_extraction_with_ffmpeg(tmp_path):
     """Generates a small 1-second synthetic audio file using FFmpeg and extracts it to MP3 and WAV."""

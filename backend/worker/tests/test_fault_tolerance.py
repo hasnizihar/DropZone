@@ -229,6 +229,7 @@ def test_ssrf_and_redirect_security_protections():
 def test_ffmpeg_service_fault_tolerance(tmp_path):
     """Verifies FFmpeg service fault-tolerance on missing inputs, invalid options, and probes."""
     service = FFmpegService()
+    service._ffmpeg_path = service._ffmpeg_path or "mock_ffmpeg"
 
     # 1. Missing input file
     with pytest.raises(WorkerProtocolError) as exc_missing:
