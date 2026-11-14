@@ -11,10 +11,14 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "website"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=@dropzone/desktop",
+    "website:dev": "npm run dev --workspace=@dropzone/website",
+    "website:build": "npm run build --workspace=@dropzone/website",
+    "website:preview": "npm run preview --workspace=@dropzone/website",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:python": "python -m pytest backend/worker/tests -v",
