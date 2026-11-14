@@ -9,6 +9,7 @@
 </p>
 
 <p align="center">
+  <a href="https://get-drop-zone.vercel.app/"><img src="https://img.shields.io/badge/Website-get--drop--zone.vercel.app-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="Website" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="License: MIT" /></a>
   <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011%20x64-warmwhite?style=flat-square&labelColor=121417&color=F5F3EF" alt="Platform: Windows 10/11 x64" />
   <img src="https://img.shields.io/badge/Version-v1.0.0--alpha.12-acidlime?style=flat-square&labelColor=121417&color=D4FF5C" alt="Version: 1.0.0-alpha.12" />
@@ -18,6 +19,11 @@
 
 <p align="center">
   A free, open-source Windows download manager for media and files. Inspect streams, download, organize, batch process, and convert content with a fast, private, local-first interface.
+  <br /><br />
+  <a href="https://get-drop-zone.vercel.app/"><strong>🌐 Official Website</strong></a> &bull;
+  <a href="https://get-drop-zone.vercel.app/#showcase"><strong>🖥️ Live Showcase</strong></a> &bull;
+  <a href="https://github.com/hasnizihar/DropZone/releases/latest"><strong>⬇️ Download Latest Release</strong></a> &bull;
+  <a href="docs/INSTALLATION.md"><strong>📖 Documentation</strong></a>
 </p>
 
 ---
@@ -62,16 +68,19 @@ DROPZONE features an intentionally restrained, high-contrast dark aesthetic buil
   <em>DROPZONE Dashboard — Real-time engine health, instant URL input bar, and activity overview.</em>
 </p>
 
+> [!TIP]
+> **Interactive Preview**: You can explore all 7 primary application views interactively with live state toggles on the [Official Landing Page Showcase](https://get-drop-zone.vercel.app/#showcase).
+
 ### Interface Gallery
 
-| View | Screenshot | Description |
-| :--- | :--- | :--- |
-| **URL Analyzer** | [screenshot-analyzer.png](docs/images/screenshot-analyzer.png) | Inspect media streams, audio codecs, bitrates, and video resolutions before starting. |
-| **Download Queue** | [screenshot-queue.png](docs/images/screenshot-queue.png) | Active progress indicators in Acid Lime, speed readouts (MB/s), ETA, and pause/resume. |
-| **Batch Downloader** | [screenshot-batch.png](docs/images/screenshot-batch.png) | Ingest multi-URL playlists, text files, and bulk queues with categorized detection. |
-| **Download History** | [screenshot-history.png](docs/images/screenshot-history.png) | Searchable SQLite database of completed downloads with quick "Open Folder" action. |
-| **Settings** | [screenshot-settings.png](docs/images/screenshot-settings.png) | Concurrency limit, default audio extraction formats (MP3/FLAC), and FFmpeg path config. |
-| **About View** | [screenshot-about.png](docs/images/screenshot-about.png) | Version information, license terms, and bundled engine status. |
+| View | Local Capture | Interactive Web Preview | Description |
+| :--- | :--- | :--- | :--- |
+| **URL Analyzer** | [screenshot-analyzer.png](docs/images/screenshot-analyzer.png) | [View in Showcase](https://get-drop-zone.vercel.app/#showcase) | Inspect media streams, audio codecs, bitrates, and video resolutions before starting. |
+| **Download Queue** | [screenshot-queue.png](docs/images/screenshot-queue.png) | [View in Showcase](https://get-drop-zone.vercel.app/#showcase) | Active progress indicators in Acid Lime, speed readouts (MB/s), ETA, and pause/resume. |
+| **Batch Downloader** | [screenshot-batch.png](docs/images/screenshot-batch.png) | [View in Showcase](https://get-drop-zone.vercel.app/#showcase) | Ingest multi-URL playlists, text files, and bulk queues with categorized detection. |
+| **Download History** | [screenshot-history.png](docs/images/screenshot-history.png) | [View in Showcase](https://get-drop-zone.vercel.app/#showcase) | Searchable SQLite database of completed downloads with quick "Open Folder" action. |
+| **Settings** | [screenshot-settings.png](docs/images/screenshot-settings.png) | [View in Showcase](https://get-drop-zone.vercel.app/#showcase) | Concurrency limit, default audio extraction formats (MP3/FLAC), and FFmpeg path config. |
+| **About View** | [screenshot-about.png](docs/images/screenshot-about.png) | [View in Showcase](https://get-drop-zone.vercel.app/#showcase) | Version information, license terms, and bundled engine status. |
 
 For the full visual capture checklist, screen dimensions, and reference specifications, see [docs/SCREENSHOTS.md](docs/SCREENSHOTS.md).
 
@@ -113,16 +122,22 @@ FFmpeg is required for merging audio/video streams, extracting audio tracks (MP3
 
 ---
 
-## Windows SmartScreen & Code Signing
+## Windows SmartScreen, Smart App Control & Code Signing
 
-DROPZONE release builds are created with official publisher metadata (`Hz Creatives`). 
+DROPZONE release builds are created with official publisher metadata (`Hz Creatives`).
 
-Because DROPZONE is an independent open-source project without a costly commercial Extended Validation (EV) certificate, Windows Defender SmartScreen or Smart App Control may display an *"Unknown Publisher"* warning on first launch:
-
+### Standard Windows Defender SmartScreen
+Because DROPZONE is an independent open-source project without a costly commercial Extended Validation (EV) certificate, Windows Defender SmartScreen may display an *"Unknown Publisher"* warning on first launch:
 1. Click **More info**.
 2. Click **Run anyway**.
 
-For technical details on how Windows evaluates binary reputation, our Authenticode pipeline, and how to verify file integrity, refer to the [Windows Code Signing Guide](docs/WINDOWS_SIGNING_GUIDE.md).
+### Windows 11 Smart App Control (Error 4551)
+On newer Windows 11 systems with **Smart App Control (SAC)** set to **Enforced**, Windows uses kernel-level application control policies that block any unsigned executable or installer child processes (`Setup.tmp`) with:
+```
+Error 4551: An Application Control policy has blocked this file.
+```
+- **For Developers & Local Testers**: Smart App Control enforcement state can be managed in **Windows Security** &rarr; **App & browser control** &rarr; **Smart App Control**.
+- **For Production Releases**: Full commercial code-signing architecture (using cloud HSM via SSL.com eSigner or Certum SimplySign) is documented in the forensic audit [Plan/WINDOWS_CODE_SIGNING_DIAGNOSIS.md](file:///D:/INDEX/DropZone/Plan/WINDOWS_CODE_SIGNING_DIAGNOSIS.md) and [docs/WINDOWS_SIGNING_GUIDE.md](docs/WINDOWS_SIGNING_GUIDE.md).
 
 ---
 
@@ -133,7 +148,7 @@ DROPZONE is organized as a clean npm workspace monorepo:
 ```
 dropzone/
 ├── apps/
-│   └── desktop/                  # Electron + React + Vite + Tailwind application
+│   └── desktop/                  # Electron + React + Vite + Tailwind desktop application
 │       ├── electron/             # Main process, secure preload, IPC channels
 │       │   └── database/         # SQLite persistence layer (sql.js WASM + migrations)
 │       ├── src/                  # React UI, Zustand state stores, views, and pages
@@ -143,6 +158,11 @@ dropzone/
 ├── backend/
 │   ├── worker/                   # Standalone Python 3.12 worker (yt-dlp, gallery-dl)
 │   └── tests/                    # Pytest suite for worker & engine fault-injection
+├── website/                      # Official landing page (React 18 + Vite 6 + Tailwind CSS)
+│   ├── src/                      # Landing page components, hero, showcase, FAQ
+│   └── public/                   # Web assets, brand icons, and application screenshots
+├── installer/                    # Inno Setup 6 compiler script (.iss) and installer graphics
+├── scripts/                      # Build automation, worker compilation, and packaging helpers
 ├── docs/                         # Architecture documentation, signing guide, checksums
 └── .github/                      # Issue templates, PR template, CI workflows
 ```
@@ -169,6 +189,9 @@ npm install
 
 # Run the desktop application in development mode
 npm run dev
+
+# Run the marketing landing page in development mode
+npm run website:dev
 ```
 
 ### Running Test Suites
@@ -186,8 +209,11 @@ npm run smoke:electron
 npm run smoke:packaged
 ```
 
-### Packaging Builds
+### Packaging & Web Builds
 ```bash
+# Build marketing landing page for production
+npm run website:build
+
 # Compile standalone Python companion worker
 npm run build:worker
 

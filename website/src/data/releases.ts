@@ -15,6 +15,7 @@ export const CURRENT_RELEASE = {
   date: 'November 13, 2026',
   license: 'MIT',
   platform: 'Windows 10 / 11 (64-bit)',
+  websiteUrl: 'https://get-drop-zone.vercel.app',
   githubRepoUrl: 'https://github.com/hasnizihar/DropZone',
   releasesUrl: 'https://github.com/hasnizihar/DropZone/releases',
   latestReleaseUrl: 'https://github.com/hasnizihar/DropZone/releases/latest',
